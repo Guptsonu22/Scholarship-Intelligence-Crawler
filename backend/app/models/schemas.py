@@ -288,3 +288,49 @@ class ScholarshipVerificationDetailResponse(BaseModel):
     evidence_references: List[dict]
     verified_at: datetime
 
+
+# --- Phase 5: Change History & Scheduler Schemas ---
+
+class ScholarshipChangeHistorySchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    scholarship_id: int
+    field_name: str
+    previous_value: Optional[str] = None
+    new_value: Optional[str] = None
+    detection_timestamp: datetime
+    previous_evidence_id: Optional[int] = None
+    new_evidence_id: Optional[int] = None
+    source_url: str
+    crawl_run_id: Optional[int] = None
+    change_classification: str
+    requires_reverification: bool
+    is_reviewed: bool
+
+
+class ScholarshipChangeListResponse(BaseModel):
+    items: List[ScholarshipChangeHistorySchema]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class SchedulerStatusResponse(BaseModel):
+    is_active: bool
+    is_running_job: bool
+    interval_seconds: int
+    last_run_time: Optional[str] = None
+    last_run_status: Optional[str] = None
+    last_run_summary: Optional[dict] = None
+    next_run_time: Optional[str] = None
+
+
+class SchedulerControlResponse(BaseModel):
+    status: str
+    message: str
+    interval_seconds: Optional[int] = None
+    next_run_time: Optional[str] = None
+
+
