@@ -344,7 +344,7 @@ export default function App() {
   return (
     <div className="container">
       <header className="header">
-        <div className="badge">EDXSO Assignment 2 • Phase 6 Real Scholarship Coverage & Official-Source Verification</div>
+        <div className="badge">EDXSO Assignment 2 • Production-Ready Scholarship Intelligence & Verification Engine</div>
         <h1>Scholarship Intelligence Crawler</h1>
         <p className="subtitle">
           Comprehensive scholarship coverage across Central & State Government, Universities, and Corporate CSR with

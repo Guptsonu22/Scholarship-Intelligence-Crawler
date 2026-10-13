@@ -62,7 +62,7 @@
     │       ├── extraction/          # Deterministic field extraction & evidence engine
     │       ├── verification/        # Deterministic scoring, mandatory gates & evidence evaluator
     │       └── lifecycle/           # ChangeDetector & LifecycleManager
-    └── tests/                       # Automated backend tests (78 tests)
+    └── tests/                       # Automated backend tests (83 tests)
 ```
 
 ---
@@ -178,7 +178,7 @@ The crawler actively fetches and verifies scholarship opportunities directly fro
 - **VERIFIED Opportunities ($\ge 95\%$ score + All 7 Gates PASS)**: **10** (Meets requirement of $\ge 10$)
 - **REVIEW_REQUIRED / EXPIRED**: **11** (Safely flagging multi-scheme portals, missing deadlines, or expired schemes)
 - **Field-Level Evidence Records**: **120** verifiable items with verbatim text and DOM selectors
-- **Verification Records in Audit Trail**: **110** persistent evaluation runs
+- **Verification Records in Audit Trail**: **194** persistent evaluation runs (historical audit log fully preserved)
 - **Historical Integrity**: Preserved AICTE Scheme #1 as `EXPIRED` and `REVIEW_REQUIRED` without recreation.
 
 ---
@@ -260,6 +260,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 - **Technical Note (<= 3 Pages)**: [docs/technical_note.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/technical_note.md)
 - **Demo & Evaluation Walkthrough**: [docs/demo_walkthrough.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/demo_walkthrough.md)
+- **Final Acceptance Test Report**: [docs/final_acceptance_test_report.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/final_acceptance_test_report.md)
 - **Detailed Architecture Specification**: [docs/architecture.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/architecture.md)
 
 ---

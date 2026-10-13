@@ -103,11 +103,11 @@ The live database (`data/scholarships.db`) was independently audited without res
 | **VERIFIED Records ($\ge 95\%$ + 7 Gates)** | $\ge 10$ | **10 records (all 96.0%)** | **PASS** |
 | **REVIEW_REQUIRED Records** | $>0$ | **11 records (62.0% – 94.0%)** | **PASS** |
 | **Field Evidence Records** | $>100$ | **120 items** | **PASS** |
-| **Verification Audit Records** | $>100$ | **110 records** | **PASS** |
+| **Verification Audit Records** | $>100$ | **194 records** | **PASS** |
 | **Primary-Source Domains** | $\ge 4$ sectors | **10 domains across 4 sectors** | **PASS** |
 | **Duplicate / Suspicious Records** | 0 | **0 duplicate URLs / names** | **PASS** |
-| **Backend Automated Tests** | All passing | **83 passed in 5.15s** | **PASS** |
-| **Frontend Production Build** | Zero errors | **Vite build clean in 1.29s** | **PASS** |
+| **Backend Automated Tests** | All passing | **83 passed in 3.99s** | **PASS** |
+| **Frontend Production Build** | Zero errors | **Vite build clean in 254ms** | **PASS** |
 
 ### Verified Scholarships Breakdown
 All 10 `VERIFIED` records represent distinct, authentic scholarships:
