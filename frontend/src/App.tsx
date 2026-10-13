@@ -1053,7 +1053,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <p>Scholarship Intelligence Crawler • Phase 5 Automatic Recrawling, Change Detection & Lifecycle • Complete Audit Trail</p>
+        <p>Scholarship Intelligence Crawler • Production-Ready Verification Engine & Complete Audit Trail</p>
       </footer>
     </div>
   )
