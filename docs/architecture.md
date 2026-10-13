@@ -11,129 +11,112 @@ graph TD
     end
 
     subgraph API [FastAPI Backend Layer]
-        Routes[API Routes: /health, /scholarships, /crawl, /analytics]
-        Scheduler[APScheduler / Background Worker]
+        HealthRoute[GET /api/health]
+        DiscoveryRoutes[GET /api/discovery/sources<br/>POST /api/discovery/run<br/>GET /api/discovery/candidates]
+        CrawlRoutes[GET /api/crawl/runs<br/>POST /api/crawl/run<br/>GET /api/crawl/candidates/:id]
     end
 
-    subgraph CoreServices [Core Crawler & Intelligence Engine]
-        Discovery[1. Discovery Service: NSP, State Portals, UGC, CSR]
-        Crawler[2. Crawling Service: Requests + BeautifulSoup / Playwright]
-        Extraction[3. Extraction Engine: Deterministic Field & Evidence Extractor]
-        Verification[4. Verification & Confidence Engine: Strict >=95% Threshold]
-        ChangeDetector[5. Change Detection: Lifecycle & Audit History]
+    subgraph CoreServices [Core Discovery & Ethical Crawling Engine]
+        Discovery[Discovery Service: Multi-Seed Scanning & Deduplication]
+        Classifier[Source Classifier: Government, University, CSR, Trust, Aggregator]
+        Normalizer[URL Normalizer: Fragment Removal, Query Cleaning, Relevance Heuristics]
+        Crawler[Crawler Service: Polite Throttling, Max Size, Content Type Safeguards]
+        Security[Security Layer: SSRF Prevention, DNS Resolution, Private Subnet Blocking]
+        Robots[Robots.txt Policy Manager: Per-Domain Caching & Compliance]
     end
 
     subgraph Storage [Storage Layer]
-        SQLite[(Persistent SQLite Database)]
-        DataDir[data/scholarships.db & data/exports/]
+        SQLite[(Persistent SQLite Database: data/scholarships.db)]
+        SeedTable[seed_sources]
+        CandTable[candidate_urls]
+        ClassTable[source_classifications]
+        RunsTable[crawl_runs]
+        AttemptsTable[crawl_attempts]
     end
 
-    Dashboard <-->|REST API / JSON| Routes
-    Scheduler --> Discovery
+    Dashboard <-->|REST API / JSON| API
+    DiscoveryRoutes --> Discovery
+    CrawlRoutes --> Crawler
+    Discovery --> Normalizer
+    Discovery --> Classifier
     Discovery --> Crawler
-    Crawler --> Extraction
-    Extraction --> Verification
-    Verification --> ChangeDetector
-    ChangeDetector --> SQLite
-    Routes <--> SQLite
+    Crawler --> Security
+    Crawler --> Robots
+    Crawler --> Storage
+    Discovery --> Storage
 ```
 
 ---
 
-## 2. Component Directory Architecture
+## 2. Implemented Architecture (Phases 1 & 2)
 
-```
-scholarship-intelligence-crawler/
-├── .env.example                     # Documented configuration template
-├── .gitignore                       # Git exclusion rules
-├── README.md                        # Quickstart & Windows PowerShell guide
-├── data/                            # Persistent SQLite database & exports
-│   └── .gitkeep
-├── docs/                            # Architecture and specification docs
-│   └── architecture.md
-├── frontend/                        # React + TypeScript + Vite dashboard
-│   ├── src/
-│   │   ├── App.tsx                  # Dashboard interface & health monitor
-│   │   ├── App.css                  # UI styling
-│   │   └── main.tsx
-│   ├── package.json
-│   └── vite.config.ts
-└── backend/                         # FastAPI application
-    ├── requirements.txt             # Python dependencies
-    ├── pyproject.toml               # Pytest & package settings
-    ├── app/
-    │   ├── main.py                  # FastAPI application entrypoint
-    │   ├── core/
-    │   │   ├── config.py            # Pydantic BaseSettings & env resolution
-    │   │   └── __init__.py
-    │   ├── db/
-    │   │   ├── database.py          # SQLAlchemy engine & session factory
-    │   │   ├── init_db.py           # DB initialization & system schema
-    │   │   └── __init__.py
-    │   ├── api/
-    │   │   ├── routes/
-    │   │   │   ├── health.py        # GET /api/health
-    │   │   │   └── __init__.py
-    │   │   └── __init__.py
-    │   ├── models/
-    │   │   ├── schemas.py           # Pydantic schemas
-    │   │   └── __init__.py
-    │   └── services/
-    │       ├── discovery/           # Discovery candidate feeds
-    │       ├── crawling/            # HTTP client, headers & delays
-    │       ├── extraction/          # Deterministic field extraction
-    │       ├── verification/        # Evidence validation & confidence scoring
-    │       └── change_detection/    # Diffs, audit trail & status changes
-    └── tests/
-        ├── test_health.py           # Health endpoint tests
-        └── test_db.py               # Database connectivity & CRUD tests
-```
+### A. Discovery Engine (`backend/app/services/discovery/`)
+- **`url_normalizer.py`**:
+  - Resolves relative URLs to canonical absolute links.
+  - Strips URL fragments (`#...`).
+  - Strips ad/tracking query parameters (`utm_*`, `ref`, `fbclid`, `gclid`, etc.) while retaining functional query arguments.
+  - Collapses redundant slashes and standardizes trailing slashes.
+  - Filters out binary file extensions (`.pdf`, `.docx`, `.zip`, `.jpg`, etc.).
+  - Calculates scholarship relevance heuristics [0.0 - 1.0] by inspecting URL slugs, anchor text, and context against weighted keywords (`scholarship`, `fellowship`, `stipend`, `yojana`, `medhabruti`, `vidyasaarathi`, `post-matric`, `pre-matric`, `eligibility`, `apply`).
+- **`discovery_service.py`**:
+  - Extracts candidate links from HTML pages via BeautifulSoup.
+  - Implements database-backed deduplication on `normalized_url`.
+  - Records discovery method (`SEED_PORTAL`, `INTERNAL_LINK`, `AGGREGATOR_LINK`), source URL, relevance score, and classification.
+
+### B. Ethical Crawler & Security Layer (`backend/app/services/crawling/`)
+- **`security.py`**:
+  - **SSRF Prevention**: Validates URL scheme (strictly `http` and `https`).
+  - Resolves domain hostnames via DNS and checks all resulting IP addresses against restricted CIDR blocks:
+    - Loopback (`127.0.0.0/8`, `::1/128`)
+    - Private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`)
+    - Link-local and cloud metadata IPs (`169.254.0.0/16`, `169.254.169.254`, `metadata.google.internal`)
+    - Carrier-grade NAT (`100.64.0.0/10`)
+    - Multicast & broadcast (`224.0.0.0/4`, `255.255.255.255`)
+- **`robots.py`**:
+  - Per-domain caching and parsing of `robots.txt` using `urllib.robotparser.RobotFileParser`.
+- **`http_client.py`**:
+  - Configurable timeouts (default 15s) and User-Agent identification.
+  - Exponential backoff retries on transient errors.
+  - Per-domain rate limiting (minimum 2.0s delay between requests to same domain).
+  - Manual step-by-step redirect inspection ensuring redirect destinations do not bypass SSRF checks.
+  - Response size safeguards (aborts streaming if body exceeds 5MB).
+  - Content-Type enforcement (accepts only `text/html`, `application/xhtml+xml`).
+  - SHA-256 content hashing of fetched HTML for audit trail integrity.
+- **`crawler_service.py`**:
+  - Orchestrates crawls on candidate URLs.
+  - Records detailed `CrawlAttempt` logs (HTTP status, response time ms, content length, SHA-256 hash, error reasons).
+  - Automatically transitions candidates from `DISCOVERED`/`QUEUED` to `CRAWLED` or `FAILED`.
+  - Recursively extracts secondary links from successfully crawled pages.
+
+### C. Source Classification Engine (`backend/app/services/verification/source_classifier.py`)
+Deterministic classification distinguishing:
+1. **`CENTRAL_GOVERNMENT`**: Apex government domains (`.gov.in`, `.nic.in`) and statutory bodies (`ugc.gov.in`, `aicte-india.org`).
+2. **`STATE_GOVERNMENT`**: State portal subdomains (e.g., `*.karnataka.gov.in`, `*.maharashtra.gov.in`, `*.up.gov.in`).
+3. **`UNIVERSITY`**: Recognized university domains (`.ac.in`, `.edu.in`).
+4. **`CORPORATE_CSR`**: Verified corporate CSR programs (`reliancefoundation.org`, `tatatrusts.org`, `ongcfoundation.org`, `infosys.org`, `hdfcbank.com`).
+5. **`TRUST_FOUNDATION`**: Registered philanthropic trusts (`kcmet.org`, `nsfoundation.co.in`, `sitaramjindalfoundation.org`, `inlaksfoundation.org`).
+6. **`AGGREGATOR`**: Scholarship listings and discovery feeds (`buddy4study.com`, `scholarshipsinindia.com`); designated as discovery feeds requiring primary source resolution.
+7. **`UNKNOWN`**: Unverified domains requiring manual review.
+
+Every classification retains an explicit explainable `classification_reason`, `is_official` boolean flag, and `trust_score`.
 
 ---
 
-## 3. Data Flow & Service Responsibilities
+## 3. Data Models (`backend/app/db/models.py`)
 
-### 1. Discovery Service (`backend/app/services/discovery`)
-- Curates authentic source seeds:
-  - **Government**: National Scholarship Portal (NSP), AICTE, UGC, state-level portals (e.g., SSP Karnataka, MahaDBT, Oasis WB).
-  - **Corporate CSR**: Reliance Foundation, Tata Trusts, HDFC Badhte Kadam, ONGC, Infosys Foundation.
-  - **University / Institute**: Central and premier state university scholarship programs.
-- Implements seed scheduling and URL deduplication.
-
-### 2. Crawling Service (`backend/app/services/crawling`)
-- Performs ethical, respectful HTTP fetching via `requests` and `beautifulsoup4`.
-- Incorporates user-agent disclosure, retry with exponential backoff, rate limiting (2-second default interval), and robots.txt checks.
-- Leaves headless Playwright available strictly for modern JS-rendered single-page applications.
-
-### 3. Extraction Engine (`backend/app/services/extraction`)
-- Deterministically parses fields:
-  - Scholarship Name / Title
-  - Provider Name & Category (Government / CSR / University / Foundation)
-  - Eligibility Criteria (Education level, Gender, Annual Family Income, Caste/Category, Minimum Marks)
-  - Financial Award & Benefits
-  - Application Deadline & Cycle
-  - Official Application URL
-  - **Evidence Text**: Verbatim textual snippets extracted from the page to support each field.
-
-### 4. Verification & Confidence Engine (`backend/app/services/verification`)
-- Calculates explainable confidence scores using deterministic scoring rules:
-  - **Domain Legitimacy**: Official `.gov.in`, `.nic.in`, `.ac.in`, `.edu`, or registered corporate CSR domains (+40 pts).
-  - **Field Completeness**: Title, provider, deadline, eligibility, award amount present (+30 pts).
-  - **Evidence Provenance**: Direct textual match in source HTML (+20 pts).
-  - **Deadlines**: Valid, unexpired future date (+10 pts).
-- **Strict Verification Rule**: A record is only tagged `VERIFIED` when confidence score is **≥ 95%** AND all mandatory fields are corroborated with evidence.
-
-### 5. Change Detection Service (`backend/app/services/change_detection`)
-- Detects field-level mutations between crawls (e.g., deadline extended, stipend increased).
-- Records historical versions in an audit trail table without overwriting past entries.
-- Tags records as `ACTIVE`, `STALE` (no update observed for 30+ days), or `EXPIRED` (deadline passed).
+- `SeedSource`: Configured portal entrypoints.
+- `CandidateURL`: Discovered candidate URLs with relevance score, status, and discovery source.
+- `SourceClassification`: Domain classifications, trust scores, and reasons.
+- `CrawlRun`: Audit session logging for discovery and crawl runs.
+- `CrawlAttempt`: Individual HTTP attempt record with timing, status, content hash, and error diagnostics.
+- `SystemInfo`: Migration and system configuration tracking.
 
 ---
 
 ## 4. Phased Implementation Roadmap
 
-- **Phase 1 (Completed)**: Project foundation, Python venv, FastAPI backend, SQLite database connectivity, React/Vite/TS dashboard, configuration management, `.env.example`, `.gitignore`, test suites, and documentation.
-- **Phase 2 (Planned)**: Authentic source seed catalogue, Discovery service, and polite Crawling service for Indian student scholarship sources.
-- **Phase 3 (Planned)**: Deterministic scholarship field extraction with verbatim evidence capture.
-- **Phase 4 (Planned)**: Explainable confidence scoring engine and strict ≥95% verification logic.
-- **Phase 5 (Planned)**: Historical change detection, lifecycle status transitions, full dashboard UI, and comprehensive verification benchmarks.
+- [x] **Phase 1**: Project Foundation, SQLite database, FastAPI backend, React/Vite/TS dashboard, configuration, test suite.
+- [x] **Phase 2**: Real Scholarship Discovery, Ethical HTTP Crawling, SSRF Protection, Robots.txt, Source Classifier, Candidate Extraction, and Crawl History Audit Trail.
+- [ ] **Phase 3**: Deterministic Scholarship Field Extraction (Title, Provider, Eligibility, Award Amount, Deadline, Official URL, and Field-Level Verbatim Evidence).
+- [ ] **Phase 4**: Deterministic Confidence & Verification Engine (Strict ≥95% confidence threshold for VERIFIED status).
+- [ ] **Phase 5**: Lifecycle Change Detection (Active, Stale, Expired), Diff Auditing, Full Interactive Dashboard, and Benchmark Evaluation.

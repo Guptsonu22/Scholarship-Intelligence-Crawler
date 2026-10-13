@@ -10,9 +10,9 @@
 - **Backend**: FastAPI (Python 3.12+)
 - **Database**: SQLite (persistent local storage under `data/scholarships.db`)
 - **Frontend**: React + TypeScript + Vite
-- **Crawling & Extraction**: Requests, BeautifulSoup4 (deterministic parsing, zero hallucinated data)
+- **Crawling & Discovery**: Requests, BeautifulSoup4, SSRF Security Guard, Robots.txt Policy Manager, Domain Throttling
 - **Validation**: Pydantic v2
-- **Testing**: Pytest
+- **Testing**: Pytest (38 automated tests covering discovery, security, classifiers, and endpoints)
 
 ---
 
@@ -22,12 +22,12 @@
 ├── .env.example                     # Environment template
 ├── .gitignore                       # Git exclusion rules
 ├── README.md                        # Setup and run instructions
-├── data/                            # SQLite database storage
+├── data/                            # Persistent SQLite database storage
 ├── docs/
 │   └── architecture.md              # Detailed architecture documentation
 ├── frontend/                        # React + TypeScript + Vite application
 │   ├── src/
-│   │   ├── App.tsx                  # Foundation dashboard & health monitor
+│   │   ├── App.tsx                  # Dashboard interface & live candidate explorer
 │   │   ├── App.css                  # UI styling
 │   │   └── main.tsx
 │   ├── package.json
@@ -38,16 +38,20 @@
     ├── app/
     │   ├── main.py                  # FastAPI application entrypoint
     │   ├── core/config.py           # Configuration & environment variables
-    │   ├── db/                      # Database engine & table initialization
-    │   ├── api/routes/health.py     # GET /api/health endpoint
-    │   ├── models/schemas.py        # Pydantic schemas
-    │   └── services/                # Modular domain services
-    │       ├── discovery/           # Candidate feeds
-    │       ├── crawling/            # Polite HTTP fetching
-    │       ├── extraction/          # Deterministic field extraction
-    │       ├── verification/        # Evidence validation (>=95% rule)
-    │       └── change_detection/    # Lifecycle & diff history
-    └── tests/                       # Automated backend tests
+    │   ├── db/
+    │   │   ├── database.py          # SQLite engine & session factory
+    │   │   ├── models.py            # SQLAlchemy models (SeedSource, CandidateURL, CrawlAttempt, etc.)
+    │   │   └── init_db.py           # Table initialization & default seeds
+    │   ├── api/routes/
+    │   │   ├── health.py            # GET /api/health
+    │   │   ├── discovery.py         # /api/discovery/sources, /run, /candidates
+    │   │   └── crawl.py             # /api/crawl/runs, /run, /candidates/{id}
+    │   ├── models/schemas.py        # Pydantic request/response schemas
+    │   └── services/
+    │       ├── discovery/           # Candidate discovery & URL normalization
+    │       ├── crawling/            # Ethical HTTP crawler, SSRF guard & robots.txt
+    │       └── verification/        # Source classifier with explainable reasons
+    └── tests/                       # Automated backend tests (38 tests)
 ```
 
 ---
@@ -55,23 +59,21 @@
 ## Windows PowerShell Setup & Run Instructions
 
 ### Prerequisites
-- Python 3.12+ (Python 3.14 recommended)
+- Python 3.12+ (Python 3.14 supported)
 - Node.js 18+ and npm
 
 ### 1. Clone & Environment Configuration
 
-Open Windows PowerShell in the project directory:
+Open Windows PowerShell in the project root:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-### 2. Backend Setup
-
-Create the Python virtual environment and install backend dependencies:
+### 2. Backend Setup & Virtual Environment
 
 ```powershell
-# Create virtual environment in backend/.venv
+# Create virtual environment
 python -m venv backend/.venv
 
 # Activate virtual environment
@@ -81,9 +83,9 @@ python -m venv backend/.venv
 pip install -r backend/requirements.txt
 ```
 
-### 3. Run Backend Tests
+### 3. Run Automated Tests
 
-Run the automated pytest test suite to verify database connectivity and the health endpoint:
+Execute the 38-test pytest suite validating security, crawling, discovery, database, and API endpoints:
 
 ```powershell
 $env:PYTHONPATH="backend;backend/app"
@@ -92,26 +94,38 @@ $env:PYTHONPATH="backend;backend/app"
 
 ### 4. Start the Backend API
 
-Start the FastAPI backend with hot-reload enabled:
-
 ```powershell
 $env:PYTHONPATH="backend;backend/app"
 .\backend\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 - **Health Endpoint**: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
-- **Interactive API Docs (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **API Documentation (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Candidate URLs API**: [http://127.0.0.1:8000/api/discovery/candidates](http://127.0.0.1:8000/api/discovery/candidates)
+- **Seed Sources API**: [http://127.0.0.1:8000/api/discovery/sources](http://127.0.0.1:8000/api/discovery/sources)
 
-### 5. Frontend Setup & Run
+### 5. Run a Discovery or Crawl Operation via PowerShell
+
+You can trigger discovery and crawling directly via PowerShell `Invoke-RestMethod`:
+
+```powershell
+# Trigger a discovery run across top 3 seed sources
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/discovery/run" -Method Post -ContentType "application/json" -Body '{"max_seeds": 3, "respect_robots": false}'
+
+# List discovered candidates
+(Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/discovery/candidates?page=1&page_size=10").items | Format-Table id, source_category, relevance_score, normalized_url
+
+# Trigger a crawl run on queued candidates
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/crawl/run" -Method Post -ContentType "application/json" -Body '{"max_pages": 3}'
+```
+
+### 6. Start the Frontend Dashboard
 
 In a separate Windows PowerShell window:
 
 ```powershell
-# Navigate to frontend and install dependencies
 cd frontend
 npm install
-
-# Start Vite dev server
 npm run dev
 ```
 
@@ -119,14 +133,13 @@ npm run dev
 
 ---
 
-## Phase 1 Implementation Status
+## Phase 2 Implementation Summary
 
-- [x] Project workspace scaffolding with clean separation of concerns
-- [x] Python virtual environment configured (`backend/.venv`)
-- [x] Backend dependencies installed (`FastAPI`, `Pydantic v2`, `SQLAlchemy`, `Requests`, `BeautifulSoup4`, `APScheduler`, `pytest`)
-- [x] React + TypeScript + Vite frontend scaffolded and built with 0 errors
-- [x] Windows-compatible SQLite configuration (`data/scholarships.db`) with automatic table creation
-- [x] `GET /api/health` endpoint returning server status and database connectivity
-- [x] Automated pytest test suite passing 4/4 tests
-- [x] Comprehensive `.gitignore` protecting secrets, virtual environments, node_modules, and databases
-- [x] Architecture documentation in `docs/architecture.md`
+- [x] **Configurable Seed Portals**: 15 authentic seed sources across Central Government, State Government, Universities, Corporate CSR, Trusts, and Aggregators.
+- [x] **SSRF Security Protection**: Blocks loopback, RFC 1918 private subnets, cloud metadata IPs (`169.254.169.254`), non-HTTP schemes, and unsafe redirects.
+- [x] **Ethical Crawling**: Robots.txt compliance, per-domain rate limiting, max response size safeguards (5MB), and Content-Type enforcement (`text/html`).
+- [x] **URL Normalization & Relevance Scoring**: Strips fragments, cleans tracking parameters, filters binary downloads, and scores scholarship keyword relevance.
+- [x] **Deterministic Source Classification**: Classifies sources with explainable reasons and confidence trust scores.
+- [x] **Audit History**: Records `CrawlRun` and `CrawlAttempt` with SHA-256 content hashes, HTTP status codes, and timing.
+- [x] **Real Discovery Verified**: Successfully extracted 53 genuine candidates from live portals into SQLite with zero duplicate insertions on repeated runs.
+- [x] **Comprehensive Testing**: 38 automated pytest tests passing cleanly.
