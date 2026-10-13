@@ -12,6 +12,7 @@ from app.db.models import (
     FieldEvidence,
     ExtractionRun,
     VerificationRecord,
+    ScholarshipChangeHistory,
 )
 
 DEFAULT_SEEDS = [
@@ -156,6 +157,8 @@ def init_db() -> None:
             cols = [row[1] for row in res.fetchall()]
             if cols and "quality_rating" not in cols:
                 conn.execute(text("ALTER TABLE field_evidence ADD COLUMN quality_rating VARCHAR(50) DEFAULT 'SUPPORTED'"))
+            if cols and "is_current" not in cols:
+                conn.execute(text("ALTER TABLE field_evidence ADD COLUMN is_current BOOLEAN DEFAULT 1"))
 
             conn.commit()
     except Exception:

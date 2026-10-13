@@ -204,6 +204,12 @@ class Scholarship(Base):
         cascade="all, delete-orphan",
         order_by="desc(VerificationRecord.verified_at)",
     )
+    change_history = relationship(
+        "ScholarshipChangeHistory",
+        back_populates="scholarship",
+        cascade="all, delete-orphan",
+        order_by="desc(ScholarshipChangeHistory.detection_timestamp)",
+    )
 
 
 class FieldEvidence(Base):
@@ -228,9 +234,38 @@ class FieldEvidence(Base):
         default="SUPPORTED",
         nullable=False,
     )  # SUPPORTED, WEAK_EVIDENCE, NOT_FOUND, CONFLICTING, STALE
+    is_current = Column(Boolean, default=True, nullable=False, index=True)
 
     scholarship = relationship("Scholarship", back_populates="evidence_records")
     candidate = relationship("CandidateURL", back_populates="evidence_records")
+
+
+class ScholarshipChangeHistory(Base):
+    """Field-level change audit trail preserving historical scholarship observations."""
+    __tablename__ = "scholarship_change_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scholarship_id = Column(Integer, ForeignKey("scholarships.id", ondelete="CASCADE"), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False, index=True)
+    previous_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    detection_timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    previous_evidence_id = Column(Integer, ForeignKey("field_evidence.id"), nullable=True)
+    new_evidence_id = Column(Integer, ForeignKey("field_evidence.id"), nullable=True)
+
+    source_url = Column(String(500), nullable=False)
+    crawl_run_id = Column(Integer, ForeignKey("crawl_runs.id"), nullable=True, index=True)
+    change_classification = Column(String(50), nullable=False, default="METADATA_UPDATE")
+    # CRITICAL_DEADLINE, BENEFIT_UPDATE, ELIGIBILITY_REVISION, URL_CHANGE, METADATA_UPDATE, LIFECYCLE_TRANSITION
+
+    requires_reverification = Column(Boolean, default=False, nullable=False)
+    is_reviewed = Column(Boolean, default=False, nullable=False)
+
+    scholarship = relationship("Scholarship", back_populates="change_history")
+    previous_evidence = relationship("FieldEvidence", foreign_keys=[previous_evidence_id])
+    new_evidence = relationship("FieldEvidence", foreign_keys=[new_evidence_id])
+    crawl_run = relationship("CrawlRun")
 
 
 class VerificationRecord(Base):
