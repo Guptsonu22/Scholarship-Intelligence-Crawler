@@ -41,17 +41,17 @@ class PageAssessor:
         soup = BeautifulSoup(html, "html.parser")
         text_content = soup.get_text(separator=" ", strip=True)
 
-        if len(text_content) < 100:
-            return "INSUFFICIENT_EVIDENCE", "Page contains less than 100 characters of readable text"
-
         url_lower = url.lower()
 
         # 1. Check for Application / Auth Portal
         if any(p in url_lower for p in ["login", "signin", "auth", "register", "otrapplication", "userlogin"]):
             inputs = soup.find_all("input")
             password_inputs = [i for i in inputs if i.get("type") == "password"]
-            if password_inputs or "password" in text_content.lower():
+            if password_inputs or "password" in text_content.lower() or "login" in text_content.lower():
                 return "APPLICATION_PORTAL", "Page is a user authentication or registration portal, not a scholarship description."
+
+        if len(text_content) < 100:
+            return "INSUFFICIENT_EVIDENCE", "Page contains less than 100 characters of readable text"
 
         # 2. Check for Multi-Scholarship Listing Page
         tables = soup.find_all("table")

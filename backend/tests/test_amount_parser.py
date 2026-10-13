@@ -25,7 +25,7 @@ def test_parse_lakh_amount():
 def test_parse_descriptive_benefit():
     text = "Selected scholars will be granted 100% Tuition Fee Waiver."
     benefit, snippet = AmountParser.parse_benefit(text)
-    assert "Tuition fee waiver" in benefit.lower()
+    assert "tuition fee waiver" in benefit.lower()
 
 
 def test_amount_missing_returns_none():
