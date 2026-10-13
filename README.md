@@ -21,7 +21,7 @@
 - **Extraction Engine**: Deterministic DOM parser, Indian date parser, monetary benefit parser, page classifier (`SCHOLARSHIP_DETAIL`, `LISTING`, `APPLICATION_PORTAL`, `GENERIC_PAGE`), and field-level evidence tracker
 - **Verification Engine (Phase 4)**: 100-point deterministic scoring model, 7 mandatory verification gates, field evidence quality ratings (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`), strict `>=95%` confidence requirement, and persistent audit history. Zero LLM reliance for confidence scoring.
 - **Repeatable Scheduler & Change Engine (Phase 5)**: Thread-safe background crawl scheduler with overlap prevention, candidate prioritization (existing scholarships due for refresh first, then official seeds), whitespace noise filtering, non-destructive historical evidence preservation (`is_current = False`), field-level change history tracking (`previous_value` $\rightarrow$ `new_value`), lifecycle transitions, and automatic re-verification triggers.
-- **Real Scholarship Coverage & Verification (Phase 6 & 7)**: 22 authentic, live-crawled scholarship opportunities across 4 sectors (Central Government, State Government, Universities/Premier Institutions, Corporate CSR/Philanthropic Foundations). 10 verified opportunities meeting $\ge 95\%$ confidence and passing all 7 mandatory gates. Over 125 traceable field evidence records and 279 verification audit records in SQLite database.
+- **Real Scholarship Coverage & Verification (Phase 6 & 7)**: 22 authentic, live-crawled scholarship opportunities across 4 sectors (Central Government, State Government, Universities/Premier Institutions, Corporate CSR/Philanthropic Foundations). 10 verified opportunities meeting $\ge 95\%$ confidence and passing all 7 mandatory gates. Over 125 traceable field evidence records and 345 historical verification audit records (with 22 active latest evaluations, exactly one per scholarship) in SQLite database.
 - **Validation**: Pydantic v2
 - **Testing**: Pytest (**83 automated tests** passing covering multi-sector source classification, detail vs listing page assessment, evidence attachment, deterministic $\ge 95\%$ verification gates, change detection, noise filtering, lifecycle transitions, network error handling, scheduler overlap prevention, extraction, security, and endpoints)
 
@@ -189,13 +189,14 @@ The crawler actively fetches and verifies scholarship opportunities directly fro
 - **Candidate URLs Discovered**: **1,136** candidate opportunities from official primary domains
 - **Historical Integrity**: Preserved AICTE Scheme #1 as `EXPIRED` and `REVIEW_REQUIRED` without recreation.
 
-### 3. Verification Audit Trail Reconciliation (110 vs. 194 vs. 323 Records)
+### 3. Verification Audit Trail Reconciliation (110 vs. 194 vs. 323 vs. 345 Records)
 
 The crawler architecture employs an **append-only verification audit log** in `verification_records`. Each evaluation appends an immutable entry and sets `is_latest = True` while marking previous evaluations for that scholarship as `is_latest = False`:
-- **110 records**: Generated during initial discovery and multi-pass ingestion runs across candidate schemes.
+- **110 records**: Generated during initial discovery and baseline multi-pass ingestion runs across candidate schemes.
 - **194 records**: Reached after completing the Phase 6 verification audit re-evaluations across all persisted records.
-- **323 records**: Current cumulative audit log count following full test suite execution, API endpoint testing, and health checks.
-- **22 active latest records**: Querying `WHERE is_latest = 1` yields exactly **22 records** — exactly one current verified evaluation per persisted scholarship.
+- **323 records**: Reached following Phase 7 acceptance tests, API integration calls, and system health checks.
+- **345 records**: Current cumulative audit log count following subsequent re-verification runs and test queries.
+- **22 active latest records**: Querying `WHERE is_latest = 1` yields exactly **22 records** — exactly one current verified evaluation per persisted scholarship. This guarantees that the audit log maintains complete temporal provenance without distorting active dashboard metrics.
 
 ### 4. Change Detection: Live Stability vs. Deterministic Test Fixtures
 
@@ -260,7 +261,38 @@ python -m venv backend/.venv
 pip install -r backend/requirements.txt
 ```
 
-### 2. Run Automated Regression Tests
+### 2. Database Initialization & Safe Verification
+
+The repository comes pre-populated with the audited, production SQLite database in `data/scholarships.db` (containing 22 authentic opportunities, 125 field evidence rows, 345 historical verification records, and 1,136 candidates).
+
+#### Safe Default Initialization (Non-Destructive)
+To run schema checks or register seed sources **without resetting or overwriting existing scholarship data**:
+```powershell
+backend\.venv\Scripts\python.exe -c "import sys; sys.path.insert(0, 'backend'); from app.db.init_db import init_db; init_db()"
+```
+*Note*: `init_db()` is strictly idempotent and non-destructive. It executes `CREATE TABLE IF NOT EXISTS`, applies non-destructive column migrations via `PRAGMA table_info`, and inserts default seed sources only if absent (`if not exists:`). Existing scholarships, field evidence, and audit logs are 100% preserved.
+
+#### Testing a Fresh Database from Scratch (Isolated Sandbox)
+If an evaluator wishes to verify database creation and seed generation from a completely empty state **without deleting or modifying `data/scholarships.db`**:
+```powershell
+# 1. Point DATABASE_URL environment variable to a new isolated SQLite file
+$env:DATABASE_URL = "sqlite:///data/scholarships_isolated.db"
+
+# 2. Run the initialization script
+backend\.venv\Scripts\python.exe -c "import sys; sys.path.insert(0, 'backend'); from app.db.init_db import init_db; init_db()"
+
+# 3. Verify clean tables and seed sources were created
+backend\.venv\Scripts\python.exe -c "import sqlite3; c = sqlite3.connect('data/scholarships_isolated.db').cursor(); print('Seed portals in clean database:', c.execute('SELECT COUNT(*) FROM seed_sources').fetchone()[0])"
+
+# 4. Remove the environment variable to revert back to the primary database
+Remove-Item env:DATABASE_URL
+```
+
+#### Historical Snapshot Backup
+An immutable WAL-consistent snapshot is archived at:
+`data/backups/scholarships_backup_final_freeze_20261013.db`
+
+### 3. Run Automated Regression Tests
 
 Execute the 83-test pytest suite validating change detection, noise filtering, lifecycle rules, scheduler overlap prevention, verification scoring, gates, boundary conditions, field extraction, dates, amounts, security, and APIs:
 
@@ -268,13 +300,13 @@ Execute the 83-test pytest suite validating change detection, noise filtering, l
 backend\.venv\Scripts\pytest.exe backend\tests\ -v
 ```
 
-### 3. Run Frontend Production Build
+### 4. Run Frontend Production Build
 
 ```powershell
 npm run build --prefix frontend
 ```
 
-### 4. Start the Backend API
+### 5. Start the Backend API
 
 ```powershell
 backend\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --app-dir backend
@@ -287,7 +319,7 @@ backend\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --ap
 - **Scholarships API**: [http://127.0.0.1:8000/api/scholarships](http://127.0.0.1:8000/api/scholarships)
 - **API Documentation (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-### 5. Start the Frontend Dashboard
+### 6. Start the Frontend Dashboard
 
 ```powershell
 npm run dev --prefix frontend
@@ -295,7 +327,7 @@ npm run dev --prefix frontend
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-### 6. Troubleshooting & Windows Development Notes
+### 7. Troubleshooting & Windows Development Notes
 
 - **Port 8000 Already in Use (`[Errno 10048]`)**:
   If Uvicorn reports `only one usage of each socket address is normally permitted`, a background instance is already bound to port 8000. In PowerShell:
@@ -325,10 +357,10 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Submission Package & Evaluation Documents
 
-- **Technical Note (<= 3 Pages)**: [docs/technical_note.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/technical_note.md)
-- **Demo & Evaluation Walkthrough**: [docs/demo_walkthrough.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/demo_walkthrough.md)
-- **Final Acceptance Test Report**: [docs/final_acceptance_test_report.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/final_acceptance_test_report.md)
-- **Detailed Architecture Specification**: [docs/architecture.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/architecture.md)
+- **Technical Note (<= 3 Pages)**: [docs/technical_note.md](docs/technical_note.md)
+- **Demo & Evaluation Walkthrough**: [docs/demo_walkthrough.md](docs/demo_walkthrough.md)
+- **Final Acceptance Test Report**: [docs/final_acceptance_test_report.md](docs/final_acceptance_test_report.md)
+- **Detailed Architecture Specification**: [docs/architecture.md](docs/architecture.md)
 
 ---
 
