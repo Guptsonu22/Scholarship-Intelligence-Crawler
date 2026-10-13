@@ -52,10 +52,10 @@ npm run dev --prefix frontend
 ### Step 2: Main Dashboard Metrics
 1. Navigate to [http://localhost:5173/](http://localhost:5173/).
 2. Verify the top metric cards (dynamically populated from `GET /api/verification/summary` and `GET /api/scholarships`):
-   - **Total Extracted**: `21`
+   - **Total Extracted**: `22`
    - **Verified (>=95%)**: `10`
-   - **Review Required**: `11`
-   - **Active Opportunities**: `20`
+   - **Review Required**: `12`
+   - **Active Opportunities**: `21`
    - **Expired Opportunities**: `1`
 3. Notice the live scheduler banner at the top showing current scheduler state (`IDLE / STOPPED`) with action buttons (`Start 24h Scheduler`, `Run Immediate Crawl`).
 

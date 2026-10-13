@@ -7,7 +7,7 @@
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-61dafb.svg)](https://react.dev/)
 [![Tests](https://img.shields.io/badge/Pytest-83%20Passed-brightgreen.svg)]()
-[![Status](https://img.shields.io/badge/Verification-10%20Verified%20%7C%2011%20Review-success.svg)]()
+[![Status](https://img.shields.io/badge/Verification-10%20Verified%20%7C%2012%20Review-success.svg)]()
 [![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
 ---
@@ -21,7 +21,7 @@
 - **Extraction Engine**: Deterministic DOM parser, Indian date parser, monetary benefit parser, page classifier (`SCHOLARSHIP_DETAIL`, `LISTING`, `APPLICATION_PORTAL`, `GENERIC_PAGE`), and field-level evidence tracker
 - **Verification Engine (Phase 4)**: 100-point deterministic scoring model, 7 mandatory verification gates, field evidence quality ratings (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`), strict `>=95%` confidence requirement, and persistent audit history. Zero LLM reliance for confidence scoring.
 - **Repeatable Scheduler & Change Engine (Phase 5)**: Thread-safe background crawl scheduler with overlap prevention, candidate prioritization (existing scholarships due for refresh first, then official seeds), whitespace noise filtering, non-destructive historical evidence preservation (`is_current = False`), field-level change history tracking (`previous_value` $\rightarrow$ `new_value`), lifecycle transitions, and automatic re-verification triggers.
-- **Real Scholarship Coverage & Verification (Phase 6)**: 21 authentic, live-crawled scholarship opportunities across 4 sectors (Central Government, State Government, Universities/Premier Institutions, Corporate CSR/Philanthropic Foundations). 10 verified opportunities meeting $\ge 95\%$ confidence and passing all 7 mandatory gates. Over 120 traceable field evidence records and 110 verification audit records in SQLite database.
+- **Real Scholarship Coverage & Verification (Phase 6 & 7)**: 22 authentic, live-crawled scholarship opportunities across 4 sectors (Central Government, State Government, Universities/Premier Institutions, Corporate CSR/Philanthropic Foundations). 10 verified opportunities meeting $\ge 95\%$ confidence and passing all 7 mandatory gates. Over 125 traceable field evidence records and 279 verification audit records in SQLite database.
 - **Validation**: Pydantic v2
 - **Testing**: Pytest (**83 automated tests** passing covering multi-sector source classification, detail vs listing page assessment, evidence attachment, deterministic $\ge 95\%$ verification gates, change detection, noise filtering, lifecycle transitions, network error handling, scheduler overlap prevention, extraction, security, and endpoints)
 
@@ -180,12 +180,13 @@ The crawler actively fetches and verifies scholarship opportunities directly fro
 
 ### 2. Database Coverage & Verification Metrics
 
-- **Total Authentic Scholarships in Database**: **21** (Exceeds requirement of $\ge 20$)
-- **Independently Checked Against Official Sources**: **21** (Exceeds requirement of $\ge 15$)
+- **Total Authentic Scholarships in Database**: **22** (Exceeds requirement of $\ge 20$)
+- **Independently Checked Against Official Sources**: **22** (Exceeds requirement of $\ge 15$)
 - **VERIFIED Opportunities ($\ge 95\%$ score + All 7 Gates PASS)**: **10** (Meets requirement of $\ge 10$)
-- **REVIEW_REQUIRED / EXPIRED**: **11** (Safely flagging multi-scheme portals, missing deadlines, or expired schemes)
-- **Field-Level Evidence Records**: **120** verifiable items with verbatim text and DOM selectors
-- **Verification Records in Audit Trail**: **194** persistent evaluation runs (historical audit log fully preserved)
+- **REVIEW_REQUIRED / EXPIRED**: **12** (Safely flagging multi-scheme portals, missing deadlines, or expired schemes)
+- **Field-Level Evidence Records**: **125** verifiable items with verbatim text and DOM selectors
+- **Verification Records in Audit Trail**: **279** persistent evaluation runs (historical audit log fully preserved)
+- **Candidate URLs Discovered**: **1,136** candidate opportunities from official primary domains
 - **Historical Integrity**: Preserved AICTE Scheme #1 as `EXPIRED` and `REVIEW_REQUIRED` without recreation.
 
 ---
@@ -209,7 +210,7 @@ The project completed a comprehensive 10-phase independent acceptance audit ([do
 | :--- | :--- | :--- |
 | `GET` | `/api/health` | Service health status and SQLite database connection check |
 | `GET` | `/api/discovery/sources` | List all 23 configured official seed scholarship portals |
-| `GET` | `/api/discovery/candidates` | Paginated candidate URLs discovered from official portals (1,065 URLs) |
+| `GET` | `/api/discovery/candidates` | Paginated candidate URLs discovered from official portals (1,136 URLs) |
 | `POST` | `/api/discovery/run` | Trigger candidate discovery run across seed sources |
 | `POST` | `/api/crawl/run` | Trigger a controlled crawl and change-detection update cycle |
 | `GET` | `/api/crawl/status` | Retrieve current crawl job and scheduler execution status |

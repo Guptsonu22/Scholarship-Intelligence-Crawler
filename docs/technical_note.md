@@ -99,11 +99,11 @@ The live database (`data/scholarships.db`) was independently audited without res
 
 | Metric | Target / Claim | Audited Result | Verification Status |
 | :--- | :---: | :---: | :---: |
-| **Total Scholarship Records** | $\ge 20$ | **21 distinct records** | **PASS** |
+| **Total Scholarship Records** | $\ge 20$ | **22 distinct records** | **PASS** |
 | **VERIFIED Records ($\ge 95\%$ + 7 Gates)** | $\ge 10$ | **10 records (all 96.0%)** | **PASS** |
-| **REVIEW_REQUIRED Records** | $>0$ | **11 records (62.0% – 94.0%)** | **PASS** |
-| **Field Evidence Records** | $>100$ | **120 items** | **PASS** |
-| **Verification Audit Records** | $>100$ | **194 records** | **PASS** |
+| **REVIEW_REQUIRED Records** | $>0$ | **12 records (62.0% – 94.0%)** | **PASS** |
+| **Field Evidence Records** | $>100$ | **125 items** | **PASS** |
+| **Verification Audit Records** | $>100$ | **279 records** | **PASS** |
 | **Primary-Source Domains** | $\ge 4$ sectors | **10 domains across 4 sectors** | **PASS** |
 | **Duplicate / Suspicious Records** | 0 | **0 duplicate URLs / names** | **PASS** |
 | **Backend Automated Tests** | All passing | **83 passed in 3.99s** | **PASS** |
