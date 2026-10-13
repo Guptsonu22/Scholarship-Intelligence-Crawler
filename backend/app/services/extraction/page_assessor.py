@@ -53,13 +53,26 @@ class PageAssessor:
         if len(text_content) < 100:
             return "INSUFFICIENT_EVIDENCE", "Page contains less than 100 characters of readable text"
 
-        # 2. Check for Multi-Scholarship Listing Page
-        tables = soup.find_all("table")
-        scheme_rows = soup.find_all(["tr", "li"], string=re.compile(r"scheme|scholarship|fellowship", re.I))
-        if any(p.search(text_content) for p in cls.LISTING_PATTERNS) or len(scheme_rows) > 8:
-            return "SCHOLARSHIP_LISTING", "Page contains an index, table, or directory of multiple scholarship schemes."
+        # 2. Check for Specific Scheme Headings (Overrides Generic Listing)
+        prominent_heading = soup.find(["h1", "h2"])
+        heading_text = prominent_heading.get_text(separator=" ", strip=True) if prominent_heading else ""
+        has_specific_scheme_heading = bool(
+            re.search(r"(?:pg\s+scholarship|pragati|saksham|swanath|yashasvi|doctoral\s+fellowship|merit-cum-means|free\s+studentship|endowment|fellowship|scholarship\s+scheme)", heading_text, re.I)
+        )
 
-        # 3. Check for Generic Portal Homepage
+        # 3. Check for Multi-Scholarship Listing Page (excluding header/nav/footer)
+        clean_soup = BeautifulSoup(html, "html.parser")
+        for nav_tag in clean_soup(["nav", "header", "footer", "aside"]):
+            nav_tag.decompose()
+        
+        clean_text = clean_soup.get_text(separator=" ", strip=True)
+        scheme_rows = clean_soup.find_all(["tr", "li"], string=re.compile(r"scheme|scholarship|fellowship", re.I))
+
+        if not has_specific_scheme_heading:
+            if any(p.search(clean_text) for p in cls.LISTING_PATTERNS) or len(scheme_rows) > 12:
+                return "SCHOLARSHIP_LISTING", "Page contains an index, table, or directory of multiple scholarship schemes."
+
+        # 4. Check for Generic Portal Homepage
         title = (soup.title.string or "").strip().lower() if soup.title and soup.title.string else ""
         if (
             url_lower.rstrip("/").endswith((".gov.in", ".ac.in", ".org", "scholarships.gov.in"))
@@ -69,10 +82,10 @@ class PageAssessor:
             if not re.search(r"eligibility|guidelines|amount|benefit|stipend|deadline", text_content, re.I):
                 return "GENERIC_PAGE", "Generic portal homepage without standalone scholarship scheme details."
 
-        # 4. Check for Scholarship Detail Evidence
-        has_scholarship_term = bool(re.search(r"scholarship|fellowship|financial aid|yojana|stipend", text_content, re.I))
-        has_criteria = bool(re.search(r"eligibility|criteria|qualification|income|documents|selection", text_content, re.I))
-        has_award_or_date = bool(re.search(r"amount|award|stipend|benefit|deadline|last date|closing date|valid till", text_content, re.I))
+        # 5. Check for Scholarship Detail Evidence
+        has_scholarship_term = bool(re.search(r"scholarship|fellowship|financial aid|yojana|stipend|grant|endowment", text_content, re.I))
+        has_criteria = bool(re.search(r"eligibility|criteria|qualification|income|documents|selection|guidelines|instruction|manual|rules|degree|diploma|gate|gpat|ph\.?d|merit|means", text_content, re.I))
+        has_award_or_date = bool(re.search(r"amount|award|stipend|benefit|deadline|last date|closing date|valid till|fee waiver|concession|rs\.?|inr|₹|per month|per annum", text_content, re.I))
 
         if has_scholarship_term and (has_criteria or has_award_or_date):
             return "SCHOLARSHIP_DETAIL", "Page contains specific scholarship opportunity details, criteria, or award benefits."
