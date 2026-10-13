@@ -18,4 +18,4 @@ print("has_award_or_date:", bool(re.search(r"amount|award|stipend|benefit|deadli
 
 from app.services.extraction.page_assessor import PageAssessor
 ptype, reason = PageAssessor.assess_page(r.text, url)
-print("Text preview:", text[:1500])
+print("Text preview:", text[:1500].encode('ascii', errors='replace').decode())
