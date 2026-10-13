@@ -87,7 +87,7 @@ class EvidenceEvaluator:
 
         # Check generic boilerplate container
         for indicator in GENERIC_BODY_INDICATORS:
-            if indicator in snip_lower and len(snip_lower) > 60 and not (val_lower in snip_lower and len(val_lower) > 15):
+            if indicator in snip_lower:
                 return "WEAK_EVIDENCE", f"Snippet appears to be generic page chrome/boilerplate containing '{indicator}'."
 
         # Field-specific evaluation

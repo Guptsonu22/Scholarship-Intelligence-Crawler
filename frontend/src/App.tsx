@@ -1,15 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-interface HealthResponse {
-  status: string
-  app_name: string
-  version: string
-  environment: string
-  database: string
-  timestamp: string
-}
-
 interface CandidateItem {
   id: number
   url: string
@@ -38,6 +29,7 @@ interface FieldEvidenceItem {
   extraction_method: string
   html_selector: string | null
   validation_status: string
+  quality_rating?: string
 }
 
 interface ScholarshipItem {
@@ -59,6 +51,8 @@ interface ScholarshipItem {
   page_type: string
   extraction_timestamp: string
   evidence_count: number
+  verification_status?: string
+  confidence_score?: number | null
 }
 
 interface ScholarshipDetailResponse {
@@ -66,25 +60,75 @@ interface ScholarshipDetailResponse {
   evidence_records: FieldEvidenceItem[]
 }
 
+interface VerificationSummary {
+  total_scholarships: number
+  verified_count: number
+  review_required_count: number
+  unverified_count: number
+  expired_count: number
+  active_count: number
+  average_confidence: number
+  last_verification_run: string | null
+}
+
+interface CriterionScoreItem {
+  criterion_name: string
+  points_awarded: number
+  max_points: number
+  explanation: string
+  deductions: string[]
+}
+
+interface GateResultItem {
+  gate_name: string
+  status: 'PASS' | 'FAIL' | 'NOT_APPLICABLE'
+  explanation: string
+  evidence_refs: any[]
+  evaluated_at: string
+}
+
+interface ScholarshipVerificationDetail {
+  scholarship_id: number
+  confidence_score: number
+  verification_status: string
+  lifecycle_status: string
+  scoring_model_version: string
+  criteria_breakdown: Record<string, CriterionScoreItem>
+  gate_results: Record<string, GateResultItem>
+  deductions: string[]
+  evidence_references: Array<{
+    evidence_id: number
+    field_name: string
+    extracted_value: string | null
+    quality_rating: string
+    explanation: string
+    source_url: string
+    snippet: string
+  }>
+  verified_at: string
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'scholarships' | 'candidates'>('scholarships')
-  const [health, setHealth] = useState<HealthResponse | null>(null)
   const [scholarships, setScholarships] = useState<ScholarshipItem[]>([])
   const [totalScholarships, setTotalScholarships] = useState<number>(0)
   const [candidates, setCandidates] = useState<CandidateItem[]>([])
   const [totalCandidates, setTotalCandidates] = useState<number>(0)
   const [loading, setLoading] = useState<boolean>(false)
   const [extracting, setExtracting] = useState<boolean>(false)
+  const [verifying, setVerifying] = useState<boolean>(false)
+  const [verificationSummary, setVerificationSummary] = useState<VerificationSummary | null>(null)
   const [selectedScholarship, setSelectedScholarship] = useState<ScholarshipDetailResponse | null>(null)
+  const [selectedVerification, setSelectedVerification] = useState<ScholarshipVerificationDetail | null>(null)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
 
-  const fetchHealth = async () => {
+  const fetchVerificationSummary = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/health')
-      if (res.ok) setHealth(await res.json())
+      const res = await fetch('http://127.0.0.1:8000/api/verification/summary')
+      if (res.ok) setVerificationSummary(await res.json())
     } catch {
-      setHealth(null)
+      setVerificationSummary(null)
     }
   }
 
@@ -100,8 +144,8 @@ export default function App() {
         setScholarships(data.items)
         setTotalScholarships(data.total)
       }
-    } catch {
-      // Backend offline or error
+    } catch (err) {
+      console.error('Error fetching scholarships:', err)
     } finally {
       setLoading(false)
     }
@@ -115,20 +159,8 @@ export default function App() {
         setCandidates(data.items)
         setTotalCandidates(data.total)
       }
-    } catch {
-      // Backend offline or error
-    }
-  }
-
-  const inspectEvidence = async (id: number) => {
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/scholarships/${id}`)
-      if (res.ok) {
-        const data: ScholarshipDetailResponse = await res.json()
-        setSelectedScholarship(data)
-      }
-    } catch {
-      // Error fetching details
+    } catch (err) {
+      console.error('Error fetching candidates:', err)
     }
   }
 
@@ -142,50 +174,98 @@ export default function App() {
       })
       if (res.ok) {
         await fetchScholarships()
-        await fetchCandidates()
+        await fetchVerificationSummary()
       }
+    } catch (err) {
+      console.error('Error running extraction session:', err)
     } finally {
       setExtracting(false)
     }
   }
 
+  const triggerVerification = async () => {
+    setVerifying(true)
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/verification/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        await fetchScholarships()
+        await fetchVerificationSummary()
+      }
+    } catch (err) {
+      console.error('Error running verification session:', err)
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const handleInspectEvidence = async (id: number) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/scholarships/${id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedScholarship(data)
+      }
+    } catch (err) {
+      console.error('Error loading scholarship detail:', err)
+    }
+  }
+
+  const handleInspectVerification = async (id: number) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/scholarships/${id}/verification`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedVerification(data)
+      }
+    } catch (err) {
+      console.error('Error loading verification detail:', err)
+    }
+  }
+
   useEffect(() => {
-    fetchHealth()
     fetchScholarships()
     fetchCandidates()
+    fetchVerificationSummary()
   }, [categoryFilter, searchQuery])
 
   return (
     <div className="container">
       <header className="header">
-        <div className="badge">EDXSO Assignment 2 • Phase 3 Extraction & Evidence</div>
+        <div className="badge">EDXSO Assignment 2 • Phase 4 Evidence Verification & Confidence Engine</div>
         <h1>Scholarship Intelligence Crawler</h1>
         <p className="subtitle">
-          Deterministic extraction of scholarship records with field-level verbatim evidence traceability.
+          Deterministic verification evaluating authenticity, freshness, and completeness using verifiable source evidence.
+          LLMs never invent confidence scores.
         </p>
       </header>
 
-      {/* Metrics Bar */}
+      {/* Metrics Bar with Real Verification Data */}
       <section className="metrics-bar">
         <div className="metric-box">
           <span className="metric-num">{totalScholarships}</span>
-          <span className="metric-label">Extracted Scholarships</span>
+          <span className="metric-label">Extracted Records</span>
         </div>
-        <div className="metric-box">
-          <span className="metric-num">{totalCandidates}</span>
-          <span className="metric-label">Crawled Candidates</span>
+        <div className="metric-box verified">
+          <span className="metric-num text-success">{verificationSummary?.verified_count ?? 0}</span>
+          <span className="metric-label">Verified (≥95% + Gates)</span>
         </div>
-        <div className="metric-box">
-          <span className="metric-num">
-            {scholarships.reduce((acc, s) => acc + s.evidence_count, 0)}
+        <div className="metric-box review">
+          <span className="metric-num text-warning">{verificationSummary?.review_required_count ?? 0}</span>
+          <span className="metric-label">Review Required</span>
+        </div>
+        <div className="metric-box expired">
+          <span className="metric-num text-danger">{verificationSummary?.expired_count ?? 0}</span>
+          <span className="metric-label">Expired Deadlines</span>
+        </div>
+        <div className="metric-box confidence">
+          <span className="metric-num text-accent">
+            {verificationSummary ? `${verificationSummary.average_confidence}%` : '—'}
           </span>
-          <span className="metric-label">Field Evidence Traces</span>
-        </div>
-        <div className="metric-box">
-          <span className="metric-num">
-            {health?.status === 'ok' ? 'Online' : 'Offline'}
-          </span>
-          <span className="metric-label">FastAPI Backend</span>
+          <span className="metric-label">Avg. Deterministic Confidence</span>
         </div>
       </section>
 
@@ -210,9 +290,9 @@ export default function App() {
           <section className="card">
             <div className="card-header">
               <div>
-                <h2>Structured Scholarship Records</h2>
+                <h2>Structured Scholarship Records & Verification</h2>
                 <p className="section-desc">
-                  Extracted without hallucinations. Blank fields remain unspecified with zero invented values.
+                  Authenticity verified against 7 mandatory gates. Records marked VERIFIED only when score ≥ 95% and all gates pass.
                 </p>
               </div>
               <div className="actions-group">
@@ -222,15 +302,23 @@ export default function App() {
                   onClick={fetchScholarships}
                   disabled={loading}
                 >
-                  {loading ? 'Refreshing...' : 'Refresh Records'}
+                  {loading ? 'Refreshing...' : 'Refresh'}
                 </button>
                 <button
                   type="button"
                   className="refresh-btn primary"
+                  onClick={triggerVerification}
+                  disabled={verifying}
+                >
+                  {verifying ? 'Evaluating Gates...' : 'Run Verification Engine'}
+                </button>
+                <button
+                  type="button"
+                  className="refresh-btn secondary"
                   onClick={triggerExtraction}
                   disabled={extracting}
                 >
-                  {extracting ? 'Extracting Fields...' : 'Run Extraction Session'}
+                  {extracting ? 'Extracting...' : 'Extract More Candidates'}
                 </button>
               </div>
             </div>
@@ -251,85 +339,106 @@ export default function App() {
                   <option value="TRUST_FOUNDATION">Trust & Foundation</option>
                 </select>
               </label>
-              <input
-                type="text"
-                placeholder="Search by scholarship or provider..."
-                className="search-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+
+              <div className="search-box">
+                <input
+                  type="text"
+                  placeholder="Search scholarship name or provider..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button type="button" className="clear-btn" onClick={() => setSearchQuery('')}>
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Scholarships Table */}
-            <div className="table-wrapper">
-              <table className="data-table">
+            <div className="table-responsive">
+              <table className="custom-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Scholarship Name</th>
-                    <th>Provider</th>
+                    <th>Opportunity & Provider</th>
                     <th>Category</th>
-                    <th>Benefit / Amount</th>
+                    <th>Lifecycle</th>
+                    <th>Confidence Score</th>
+                    <th>Verification Status</th>
                     <th>Closing Date</th>
-                    <th>Evidence</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scholarships.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="empty-state">
-                        {loading
-                          ? 'Loading scholarships...'
-                          : 'No structured scholarships extracted yet. Click "Run Extraction Session" to process candidates.'}
+                      <td colSpan={7} className="text-center empty-cell">
+                        {loading ? 'Loading records...' : 'No scholarships found. Run extraction or crawler to discover opportunities.'}
                       </td>
                     </tr>
                   ) : (
-                    scholarships.map((s) => (
-                      <tr key={s.id}>
-                        <td>#{s.id}</td>
-                        <td className="name-cell">
-                          <strong>{s.name || 'Not specified'}</strong>
-                          <div className="sub-url">
-                            <a href={s.official_source_url} target="_blank" rel="noopener noreferrer">
-                              {s.official_source_url}
-                            </a>
-                          </div>
-                        </td>
-                        <td>{s.provider || <span className="unspecified">Not specified</span>}</td>
-                        <td>
-                          <span className={`tag-category ${s.source_category.toLowerCase()}`}>
-                            {s.source_category.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td>
-                          {s.amount_benefit ? (
-                            <span className="benefit-badge">{s.amount_benefit}</span>
-                          ) : (
-                            <span className="unspecified">Not specified</span>
-                          )}
-                        </td>
-                        <td>
-                          {s.closing_date ? (
-                            <span className="date-badge">{s.closing_date}</span>
-                          ) : (
-                            <span className="unspecified">Not specified</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className="score-pill">{s.evidence_count} Fields</span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="inspect-btn"
-                            onClick={() => inspectEvidence(s.id)}
-                          >
-                            Trace Evidence
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    scholarships.map((s) => {
+                      const isExpired = s.lifecycle_status === 'EXPIRED'
+                      const isVerified = s.verification_status === 'VERIFIED'
+                      const scoreVal = s.confidence_score ?? null
+
+                      return (
+                        <tr key={s.id} className={isExpired ? 'row-expired' : ''}>
+                          <td className="opportunity-cell">
+                            <strong className="title-text">{s.name || 'Untitled Opportunity'}</strong>
+                            <div className="provider-subtext">{s.provider || 'Provider not explicitly specified'}</div>
+                            <div className="source-domain">
+                              <a href={s.official_source_url} target="_blank" rel="noopener noreferrer">
+                                {new URL(s.official_source_url).hostname} ↗
+                              </a>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`tag-category ${s.source_category.toLowerCase()}`}>
+                              {s.source_category.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`lifecycle-tag ${s.lifecycle_status.toLowerCase()}`}>
+                              {isExpired ? '⚠️ EXPIRED' : s.lifecycle_status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="score-pill-container">
+                              <span className={`score-badge ${scoreVal !== null && scoreVal >= 95 ? 'high' : scoreVal !== null && scoreVal >= 70 ? 'medium' : 'low'}`}>
+                                {scoreVal !== null ? `${scoreVal.toFixed(1)}%` : 'Not Scored'}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`verification-badge ${(s.verification_status || 'unverified').toLowerCase()}`}>
+                              {isVerified ? '✓ VERIFIED' : s.verification_status === 'REVIEW_REQUIRED' ? '⚠️ REVIEW REQUIRED' : 'UNVERIFIED'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={isExpired ? 'text-danger font-medium' : ''}>
+                              {s.closing_date || 'Ongoing / Rolling'}
+                            </span>
+                          </td>
+                          <td className="actions-cell">
+                            <button
+                              type="button"
+                              className="btn-action primary"
+                              onClick={() => handleInspectVerification(s.id)}
+                            >
+                              Audit Breakdown
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-action secondary"
+                              onClick={() => handleInspectEvidence(s.id)}
+                            >
+                              Field Evidence ({s.evidence_count})
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -341,12 +450,15 @@ export default function App() {
           <section className="card">
             <div className="card-header">
               <div>
-                <h2>Discovered Candidate URLs</h2>
-                <p className="section-desc">Entrypoint candidates queued for crawling and extraction.</p>
+                <h2>Discovered Candidate Pages ({totalCandidates})</h2>
+                <p className="section-desc">
+                  URLs discovered via seed crawling with ethical throttles, robots.txt compliance, and anti-SSRF filters.
+                </p>
               </div>
             </div>
-            <div className="table-wrapper">
-              <table className="data-table">
+
+            <div className="table-responsive">
+              <table className="custom-table">
                 <thead>
                   <tr>
                     <th>ID</th>
@@ -384,7 +496,151 @@ export default function App() {
           </section>
         )}
 
-        {/* Evidence Modal / Detail Drawer */}
+        {/* Verification Audit Modal */}
+        {selectedVerification && (
+          <div className="modal-backdrop" onClick={() => setSelectedVerification(null)}>
+            <div className="modal-content modal-verification" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <span className="modal-badge">
+                    CONFIDENCE ENGINE • MODEL: {selectedVerification.scoring_model_version}
+                  </span>
+                  <h2>Deterministic Verification Audit • #{selectedVerification.scholarship_id}</h2>
+                </div>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => setSelectedVerification(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="modal-body">
+                {/* Score & Status Highlight */}
+                <div className="verification-hero">
+                  <div className="hero-score-box">
+                    <span className="hero-score-label">Computed Confidence</span>
+                    <span className={`hero-score-val ${selectedVerification.confidence_score >= 95 ? 'text-success' : 'text-warning'}`}>
+                      {selectedVerification.confidence_score.toFixed(1)}%
+                    </span>
+                    <span className="hero-score-subtext">Evidence-based deterministic score</span>
+                  </div>
+                  <div className="hero-status-box">
+                    <span className="hero-score-label">Verification Outcome</span>
+                    <span className={`hero-status-badge ${selectedVerification.verification_status.toLowerCase()}`}>
+                      {selectedVerification.verification_status === 'VERIFIED' ? '✓ VERIFIED' : '⚠️ REVIEW REQUIRED'}
+                    </span>
+                    <span className="hero-score-subtext">
+                      Lifecycle: <strong>{selectedVerification.lifecycle_status}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Warning if Review Required */}
+                {selectedVerification.verification_status !== 'VERIFIED' && (
+                  <div className="verification-alert-box">
+                    <h4>⚠️ Why This Opportunity Failed Verification</h4>
+                    <p>
+                      A record can only be marked VERIFIED when its score is at least 95.0% AND all mandatory verification gates pass.
+                    </p>
+                    {selectedVerification.deductions.length > 0 && (
+                      <ul className="deductions-list">
+                        {selectedVerification.deductions.map((d, idx) => (
+                          <li key={idx}>{d}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Mandatory Verification Gates */}
+                <h3>Mandatory Verification Gates (All 7 Must Pass for Verified Status)</h3>
+                <div className="gates-grid">
+                  {Object.entries(selectedVerification.gate_results).map(([gName, gVal]) => {
+                    const isPass = gVal.status === 'PASS'
+                    const isNA = gVal.status === 'NOT_APPLICABLE'
+                    return (
+                      <div key={gName} className={`gate-card ${gVal.status.toLowerCase()}`}>
+                        <div className="gate-header">
+                          <span className="gate-title">{gName.replace(/_/g, ' ')}</span>
+                          <span className={`gate-status-pill ${gVal.status.toLowerCase()}`}>
+                            {isPass ? '✓ PASS' : isNA ? '⚪ NOT APPLICABLE' : '✕ FAIL'}
+                          </span>
+                        </div>
+                        <p className="gate-explanation">{gVal.explanation}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* 100-Point Criteria Breakdown */}
+                <h3>100-Point Deterministic Formula Allocation</h3>
+                <div className="table-responsive">
+                  <table className="breakdown-table">
+                    <thead>
+                      <tr>
+                        <th>Criterion</th>
+                        <th>Points Awarded</th>
+                        <th>Max Points</th>
+                        <th>Deterministic Explanation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(selectedVerification.criteria_breakdown).map(([cKey, cVal]) => (
+                        <tr key={cKey}>
+                          <td><strong>{cKey.replace(/_/g, ' ')}</strong></td>
+                          <td>
+                            <span className={`pts-tag ${cVal.points_awarded === cVal.max_points ? 'full' : cVal.points_awarded > 0 ? 'partial' : 'zero'}`}>
+                              {cVal.points_awarded.toFixed(1)}
+                            </span>
+                          </td>
+                          <td>{cVal.max_points.toFixed(1)}</td>
+                          <td className="explanation-cell">
+                            <div>{cVal.explanation}</div>
+                            {cVal.deductions && cVal.deductions.length > 0 && (
+                              <div className="criterion-deductions">
+                                {cVal.deductions.map((cd, i) => (
+                                  <span key={i} className="deduction-chip">• {cd}</span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Evidence References Used */}
+                <h3>Field Evidence Quality Ratings ({selectedVerification.evidence_references.length} Items)</h3>
+                <div className="evidence-list">
+                  {selectedVerification.evidence_references.map((ev, i) => (
+                    <div key={i} className="evidence-card">
+                      <div className="evidence-header">
+                        <span className="field-tag">{ev.field_name}</span>
+                        <span className={`quality-badge ${ev.quality_rating.toLowerCase()}`}>
+                          {ev.quality_rating}
+                        </span>
+                      </div>
+                      <div className="evidence-value">
+                        <strong>Value:</strong> {ev.extracted_value || 'None'}
+                      </div>
+                      <blockquote className="evidence-snippet">
+                        "{ev.snippet}"
+                      </blockquote>
+                      <div className="evidence-footer">
+                        <span>Relevance Audit: {ev.explanation}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Raw Evidence Modal */}
         {selectedScholarship && (
           <div className="modal-backdrop" onClick={() => setSelectedScholarship(null)}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -492,24 +748,24 @@ export default function App() {
               <p>Deterministic field extraction with traceable verbatim evidence.</p>
               <span className="state-tag active">COMPLETED</span>
             </div>
-            <div className="phase-badge pending">
+            <div className="phase-badge completed">
               <span className="phase-num">Phase 4</span>
               <h3>Verification & Scoring</h3>
-              <p>Explainable confidence scoring; strictly ≥95% required for VERIFIED status.</p>
-              <span className="state-tag">NEXT PHASE</span>
+              <p>Deterministic confidence scoring engine; strictly ≥95% required for VERIFIED status.</p>
+              <span className="state-tag active">COMPLETED</span>
             </div>
             <div className="phase-badge pending">
               <span className="phase-num">Phase 5</span>
               <h3>Change Detection & UI</h3>
               <p>Audit logging, diff tracking, status lifecycle (Active, Stale, Expired), and full UI.</p>
-              <span className="state-tag">PLANNED</span>
+              <span className="state-tag">NEXT PHASE</span>
             </div>
           </div>
         </section>
       </main>
 
       <footer className="footer">
-        <p>Scholarship Intelligence Crawler • Phase 3 Extraction & Evidence Verified • Zero hallucinated data policy</p>
+        <p>Scholarship Intelligence Crawler • Phase 4 Verification & Confidence Engine • Zero hallucinated scores</p>
       </footer>
     </div>
   )

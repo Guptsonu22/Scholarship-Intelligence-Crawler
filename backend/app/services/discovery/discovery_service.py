@@ -199,7 +199,7 @@ class DiscoveryService:
             crawl_run.error_message = str(exc)
             logger.error(f"Discovery run failed: {exc}", exc_info=True)
         finally:
-            crawl_run.completed_at = crawl_run.completed_at or CrawlRun.completed_at.default.arg(None)
+            crawl_run.completed_at = crawl_run.completed_at or datetime.now(timezone.utc)
             db.commit()
 
         return crawl_run
