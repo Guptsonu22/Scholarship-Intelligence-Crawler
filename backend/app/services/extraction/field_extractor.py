@@ -241,7 +241,7 @@ class FieldExtractor:
             "eligibility": "Students admitted to undergraduate and postgraduate programmes whose annual family income is below ₹15 Lakhs.",
             "selection": "Need-based financial assessment by the university financial assistance committee.",
         },
-        "tatatrusts": {
+        "individual-grants": {
             "name": "JN Tata Endowment for the Higher Education of Indians",
             "provider": "Tata Trusts",
             "amount": "Loan scholarship up to ₹10,00,000 plus travel grants",

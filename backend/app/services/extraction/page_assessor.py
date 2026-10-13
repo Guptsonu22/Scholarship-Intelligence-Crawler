@@ -15,7 +15,7 @@ class PageAssessor:
     # Keywords indicative of listing pages
     LISTING_PATTERNS = [
         re.compile(r"schemes on nsp|list of scholarships|all scholarships|view all schemes", re.I),
-        re.compile(r"scholarship directory|schemes list|available scholarships", re.I),
+        re.compile(r"scholarship directory|scheme directory|schemes list|available scholarships", re.I),
     ]
 
     # Keywords indicative of generic home / informational pages
