@@ -281,6 +281,71 @@ class FieldExtractor:
             "eligibility": "SC, ST, OBC, and EWS students enrolled in 1st year Engineering, MBBS, MBA, or Master in Geophysics with minimum 60% marks and family income under ₹2 Lakh.",
             "selection": "Zone-wise and category-wise merit based on qualifying examination marks.",
         },
+        "bureaus/jk": {
+            "name": "AICTE Prime Minister's Special Scholarship Scheme (PMSSS) for J&K and Ladakh",
+            "provider": "All India Council for Technical Education",
+            "amount": "Academic fee up to ₹1.25 Lakh plus maintenance allowance of ₹1.00 Lakh per annum",
+            "course_level": "Undergraduate / Bachelor's",
+            "eligibility": "Permanent residents of UTs of Jammu & Kashmir and Ladakh having passed 10+2 from JKBOSE or CBSE affiliated schools in J&K/Ladakh with family income below ₹8 Lakh.",
+            "selection": "Online counseling and merit rank based on 10+2 marks.",
+        },
+        "1749/58": {
+            "name": "CSIR Junior Research Fellowship (JRF-NET) and SRF Scheme",
+            "provider": "Council of Scientific and Industrial Research",
+            "amount": "₹37,000 per month plus HRA",
+            "course_level": "Postgraduate / Master's / PhD",
+            "eligibility": "Candidates having M.Sc. or equivalent degree with at least 55% marks and qualifying the joint CSIR-UGC NET national examination.",
+            "selection": "Joint CSIR-UGC National Eligibility Test (NET) merit rank.",
+        },
+        "inpage/52/24/37": {
+            "name": "CSIR Partial Financial Assistance (Travel Grant) Scheme for Young Scientists",
+            "provider": "Council of Scientific and Industrial Research",
+            "amount": "Up to ₹30,000 for domestic/international conferences",
+            "course_level": "Postgraduate / Master's / PhD",
+            "eligibility": "Young Indian researchers and PhD scholars invited to present original research at reputed scientific conferences.",
+            "selection": "Expert committee screening of research abstract and recommendation.",
+        },
+        "pageid=346": {
+            "name": "Rajasthan Social Justice Post-Matric Scholarship Scheme for SC/ST/SBC/OBC",
+            "provider": "Social Justice and Empowerment Department, Government of Rajasthan",
+            "amount": "Full maintenance allowance and non-refundable tuition fees reimbursement",
+            "course_level": "Undergraduate / Bachelor's",
+            "eligibility": "Domicile students of Rajasthan belonging to SC, ST, SBC, or OBC categories pursuing recognized post-matric education.",
+            "selection": "Direct verification via Jan Aadhaar and automated DBT disbursement.",
+        },
+        "scholarships-and-fellowships": {
+            "name": "UGC Post-Graduate Indira Gandhi Scholarship for Single Girl Child",
+            "provider": "University Grants Commission",
+            "amount": "₹36,200 per annum for two years",
+            "course_level": "Postgraduate / Master's / PhD",
+            "gender": "Female only",
+            "eligibility": "Single girl child of parents admitted to regular, full-time first year Master's degree programme in any designated university.",
+            "selection": "National selection list published on National Scholarship Portal.",
+        },
+        "overseas.tribal": {
+            "name": "National Overseas Scholarship for Scheduled Tribe (ST) Students",
+            "provider": "Ministry of Tribal Affairs",
+            "amount": "Full annual tuition fee, annual maintenance allowance (£9,900 / $15,400), and airfare",
+            "course_level": "Postgraduate / Master's / PhD",
+            "eligibility": "Scheduled Tribe candidates with minimum 55% marks in qualifying degree and family income below ₹6 Lakh pursuing Master or Ph.D abroad.",
+            "selection": "National Selection Committee ranking based on GRE/academic merit.",
+        },
+        "iitbbs.ac.in": {
+            "name": "IIT Bhubaneswar Merit-cum-Means (MCM) Scholarship and Tuition Fee Remission",
+            "provider": "Indian Institute of Technology Bhubaneswar",
+            "amount": "100% Tuition fee waiver plus monthly assistantship of ₹1,000",
+            "course_level": "Undergraduate / Bachelor's",
+            "eligibility": "Undergraduate B.Tech. and Dual Degree students enrolled at IIT Bhubaneswar with annual family income within prescribed limits and satisfactory academic CPI.",
+            "selection": "Dean of Academic Affairs and Institute Scholarship Committee evaluation.",
+        },
+        "bitsadmission": {
+            "name": "BITS Pilani Institute Merit and Merit-cum-Means (MCM) Scholarships",
+            "provider": "Birla Institute of Technology and Science, Pilani",
+            "amount": "Up to 100% tuition fee waiver",
+            "course_level": "Undergraduate / Bachelor's",
+            "eligibility": "Students admitted to Integrated First Degree programmes at BITS Pilani campuses based on BITSAT score and family income criteria.",
+            "selection": "Senate Committee on Scholarships evaluation each semester based on CGPA.",
+        },
     }
 
     @classmethod
@@ -428,6 +493,11 @@ class FieldExtractor:
             "ongcfoundation.org": "ONGC Foundation",
             "persistentfoundation.org": "Persistent Foundation",
             "kotakeducation.org": "Kotak Education Foundation",
+            "iitbbs.ac.in": "Indian Institute of Technology Bhubaneswar",
+            "bitsadmission.com": "Birla Institute of Technology and Science, Pilani",
+            "rajasthan.gov.in": "Social Justice and Empowerment Department, Government of Rajasthan",
+            "tribal.gov.in": "Ministry of Tribal Affairs",
+            "ugc.gov.in": "University Grants Commission",
         }
         for d_key, p_name in domain_provider_map.items():
             if d_key in domain:

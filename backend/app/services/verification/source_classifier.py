@@ -137,13 +137,13 @@ class SourceClassifier:
             )
 
         # 3. University / Educational Institution identification
-        if clean_domain.endswith(".ac.in") or clean_domain.endswith(".edu.in"):
+        if clean_domain.endswith(".ac.in") or clean_domain.endswith(".edu.in") or "bitsadmission.com" in clean_domain:
             return SourceClassificationResult(
                 domain=clean_domain,
                 category="UNIVERSITY",
                 is_official=True,
                 trust_score=0.95,
-                reason="Official Indian accredited university / academic institution domain (.ac.in / .edu.in).",
+                reason="Official Indian accredited university / academic institution domain.",
             )
 
         # 4. Corporate CSR Programs
