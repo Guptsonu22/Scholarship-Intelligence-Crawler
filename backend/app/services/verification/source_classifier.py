@@ -10,7 +10,10 @@ KNOWN_CORPORATE_CSR_DOMAINS = {
     "hdfcbank.com",
     "tatamotors.com",
     "adityabirla.com",
+    "adityabirlascholars.net",
     "drreddys.com",
+    "persistentfoundation.org",
+    "kotakeducation.org",
 }
 
 # Known philanthropic trusts and educational foundations
@@ -21,6 +24,7 @@ KNOWN_TRUST_DOMAINS = {
     "sitaramjindalfoundation.org",
     "inlaksfoundation.org",
     "azimpremjifoundation.org",
+    "azimpremjiuniversity.edu.in",
     "loreal.com",
 }
 
@@ -41,12 +45,14 @@ STATE_GOV_IDENTIFIERS = [
     "bihar.gov.in",
     "odisha.gov.in",
     "wb.gov.in",
+    "oasis.gov.in",
     "tn.gov.in",
     "kerala.gov.in",
     "rajasthan.gov.in",
     "mp.gov.in",
     "punjab.gov.in",
     "haryana.gov.in",
+    "highereduhry.ac.in",
     "gujarat.gov.in",
     "assam.gov.in",
     "telangana.gov.in",
@@ -111,7 +117,17 @@ class SourceClassifier:
                 reason="Verified Government of India official apex domain (.gov.in / .nic.in).",
             )
 
-        if clean_domain in ("aicte-india.org", "ugc.gov.in", "dst.gov.in", "education.gov.in"):
+        if clean_domain in (
+            "aicte-india.org",
+            "aicte.gov.in",
+            "facilities.aicte-india.org",
+            "pgscholarship.aicte.gov.in",
+            "ugc.gov.in",
+            "dst.gov.in",
+            "online-inspire.gov.in",
+            "csirhrdg.res.in",
+            "education.gov.in",
+        ):
             return SourceClassificationResult(
                 domain=clean_domain,
                 category="CENTRAL_GOVERNMENT",
