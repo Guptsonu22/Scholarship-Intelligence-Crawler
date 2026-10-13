@@ -145,6 +145,7 @@ class FieldEvidenceSchema(BaseModel):
     extraction_method: str
     html_selector: Optional[str] = None
     validation_status: str
+    quality_rating: Optional[str] = "SUPPORTED"
 
 
 class ScholarshipSchema(BaseModel):
@@ -185,6 +186,8 @@ class ScholarshipSchema(BaseModel):
     extraction_method: str
     validation_warnings: Optional[str] = None
     evidence_count: int = 0
+    verification_status: str = "UNVERIFIED"
+    confidence_score: Optional[float] = None
 
 
 class ScholarshipDetailSchema(BaseModel):
@@ -229,3 +232,59 @@ class ExtractionRunSchema(BaseModel):
     insufficient_evidence_count: int
     failed_count: int
     error_message: Optional[str] = None
+
+
+# --- Phase 4: Verification Schemas ---
+
+class VerificationRunRequest(BaseModel):
+    scholarship_ids: Optional[List[int]] = Field(None, description="Optional list of specific scholarship IDs to verify")
+    reference_date: Optional[str] = Field(None, description="Optional ISO date (YYYY-MM-DD) for controlled deadline/freshness testing")
+
+
+class VerificationRunResponse(BaseModel):
+    records_evaluated: int
+    verified_count: int
+    review_required_count: int
+    message: str
+
+
+class VerificationSummaryResponse(BaseModel):
+    total_scholarships: int
+    verified_count: int
+    review_required_count: int
+    unverified_count: int
+    expired_count: int
+    active_count: int
+    average_confidence: float
+    last_verification_run: Optional[str] = None
+
+
+class VerificationRecordSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    scholarship_id: int
+    confidence_score: float
+    verification_status: str
+    lifecycle_status: str
+    scoring_model_version: str
+    scoring_breakdown: str
+    gate_results: str
+    deductions_reasons: str
+    evidence_references: Optional[str] = None
+    is_latest: bool
+    verified_at: datetime
+
+
+class ScholarshipVerificationDetailResponse(BaseModel):
+    scholarship_id: int
+    confidence_score: float
+    verification_status: str
+    lifecycle_status: str
+    scoring_model_version: str
+    criteria_breakdown: dict
+    gate_results: dict
+    deductions: List[str]
+    evidence_references: List[dict]
+    verified_at: datetime
+

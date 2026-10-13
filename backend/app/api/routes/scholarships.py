@@ -10,6 +10,7 @@ from app.models.schemas import (
     ScholarshipDetailSchema,
     ScholarshipListResponse,
     FieldEvidenceSchema,
+    ScholarshipVerificationDetailResponse,
 )
 
 router = APIRouter(prefix="/scholarships", tags=["Scholarships"])
@@ -111,3 +112,71 @@ def get_scholarship_field_evidence(
         query = query.filter(FieldEvidence.field_name == field_name)
 
     return query.order_by(FieldEvidence.id.asc()).all()
+
+
+@router.get("/{scholarship_id}/verification", response_model=ScholarshipVerificationDetailResponse)
+def get_scholarship_verification(
+    scholarship_id: int,
+    db: Session = Depends(get_db),
+):
+    """Retrieve detailed verification score breakdown, mandatory gate results, and deductions."""
+    import json
+    from app.models.schemas import ScholarshipVerificationDetailResponse
+    from app.services.verification.verification_engine import VerificationEngine
+    from app.db.models import VerificationRecord
+
+    scholarship = db.query(Scholarship).filter(Scholarship.id == scholarship_id).first()
+    if not scholarship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scholarship #{scholarship_id} not found",
+        )
+
+    latest_record = (
+        db.query(VerificationRecord)
+        .filter(
+            VerificationRecord.scholarship_id == scholarship_id,
+            VerificationRecord.is_latest == True,
+        )
+        .first()
+    )
+
+    if not latest_record:
+        latest_record = VerificationEngine.verify_scholarship(
+            scholarship_id=scholarship_id,
+            db=db,
+        )
+
+    try:
+        criteria_dict = json.loads(latest_record.scoring_breakdown)
+    except Exception:
+        criteria_dict = {}
+
+    try:
+        gate_dict = json.loads(latest_record.gate_results)
+    except Exception:
+        gate_dict = {}
+
+    try:
+        deductions_list = json.loads(latest_record.deductions_reasons)
+    except Exception:
+        deductions_list = []
+
+    try:
+        evidence_list = json.loads(latest_record.evidence_references) if latest_record.evidence_references else []
+    except Exception:
+        evidence_list = []
+
+    return ScholarshipVerificationDetailResponse(
+        scholarship_id=latest_record.scholarship_id,
+        confidence_score=latest_record.confidence_score,
+        verification_status=latest_record.verification_status,
+        lifecycle_status=latest_record.lifecycle_status,
+        scoring_model_version=latest_record.scoring_model_version,
+        criteria_breakdown=criteria_dict,
+        gate_results=gate_dict,
+        deductions=deductions_list,
+        evidence_references=evidence_list,
+        verified_at=latest_record.verified_at,
+    )
+
