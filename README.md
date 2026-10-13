@@ -219,20 +219,24 @@ python -m venv backend/.venv
 pip install -r backend/requirements.txt
 ```
 
-### 2. Run Automated Tests
+### 2. Run Automated Regression Tests
 
-Execute the 78-test pytest suite validating change detection, noise filtering, lifecycle rules, scheduler overlap prevention, verification scoring, gates, boundary conditions, field extraction, dates, amounts, security, and APIs:
+Execute the 83-test pytest suite validating change detection, noise filtering, lifecycle rules, scheduler overlap prevention, verification scoring, gates, boundary conditions, field extraction, dates, amounts, security, and APIs:
 
 ```powershell
-$env:PYTHONPATH="backend;backend/app"
-.\backend\.venv\Scripts\python.exe -m pytest backend/tests -v
+backend\.venv\Scripts\pytest.exe backend\tests\ -v
 ```
 
-### 3. Start the Backend API
+### 3. Run Frontend Production Build
 
 ```powershell
-$env:PYTHONPATH="backend;backend/app"
-.\backend\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --reload
+npm run build --prefix frontend
+```
+
+### 4. Start the Backend API
+
+```powershell
+backend\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --app-dir backend
 ```
 
 - **Health Endpoint**: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
@@ -242,10 +246,29 @@ $env:PYTHONPATH="backend;backend/app"
 - **Scholarships API**: [http://127.0.0.1:8000/api/scholarships](http://127.0.0.1:8000/api/scholarships)
 - **API Documentation (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-### 4. Start the Frontend Dashboard
+### 5. Start the Frontend Dashboard
 
 ```powershell
 npm run dev --prefix frontend
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## Submission Package & Evaluation Documents
+
+- **Technical Note (<= 3 Pages)**: [docs/technical_note.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/technical_note.md)
+- **Demo & Evaluation Walkthrough**: [docs/demo_walkthrough.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/demo_walkthrough.md)
+- **Detailed Architecture Specification**: [docs/architecture.md](file:///c:/Users/Sonu/OneDrive/Desktop/Scholarship%20Intelligence%20Crawler/docs/architecture.md)
+
+---
+
+## Ethical Crawling Safeguards & Security Controls
+
+1. **SSRF Guard**: Strict destination IP validation blocks loopback addresses (`127.0.0.0/8`), private RFC1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local IPs (`169.254.0.0/16`), and AWS/GCP cloud metadata endpoints.
+2. **Robots.txt Adherence**: Cached `RobotsPolicyManager` inspects portal crawl permissions before every HTTP request.
+3. **Domain Throttling**: 2.0-second default delay enforced per host to prevent request flooding.
+4. **Content-Type & Size Caps**: Strict rejection of non-HTML payloads and responses exceeding 10 MB.
+5. **No Synthetic Hallucinations**: Zero LLM dependencies in confidence scoring; 100% deterministic, rule-based verification with traceable evidence.
+
