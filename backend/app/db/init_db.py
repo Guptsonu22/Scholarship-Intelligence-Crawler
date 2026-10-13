@@ -119,6 +119,63 @@ DEFAULT_SEEDS = [
         "description": "Sitaram Jindal Foundation educational merit-cum-means scholarships.",
         "scrape_depth": 2,
     },
+    # Phase 6: Additional Official Primary Sources
+    {
+        "name": "DST INSPIRE Fellowship Scheme",
+        "base_url": "https://online-inspire.gov.in/",
+        "category": "CENTRAL_GOVERNMENT",
+        "description": "Department of Science and Technology INSPIRE Fellowship for doctoral and higher education.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "CSIR Human Resource Development Group",
+        "base_url": "https://csirhrdg.res.in/",
+        "category": "CENTRAL_GOVERNMENT",
+        "description": "CSIR-UGC NET Junior Research Fellowship (JRF) and Senior Research Fellowship.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "West Bengal OASIS Portal",
+        "base_url": "https://oasis.gov.in/",
+        "category": "STATE_GOVERNMENT",
+        "description": "Backward Classes Welfare Department, Govt of West Bengal post-matric scholarship scheme.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "Haryana Har-Chhatravratti Portal",
+        "base_url": "https://harchhatravratti.highereduhry.ac.in/",
+        "category": "STATE_GOVERNMENT",
+        "description": "Department of Higher Education Haryana centralized scholarship portal.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "Odisha State Scholarship Portal",
+        "base_url": "https://scholarship.odisha.gov.in/",
+        "category": "STATE_GOVERNMENT",
+        "description": "Higher Education Department Government of Odisha e-Medhabruti and scholarship portal.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "IIT Kanpur Dean of Resources and Alumni",
+        "base_url": "https://www.iitk.ac.in/dora/scholarships",
+        "category": "UNIVERSITY",
+        "description": "Indian Institute of Technology Kanpur Merit-cum-Means and donor scholarships.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "Azim Premji University Aid",
+        "base_url": "https://azimpremjiuniversity.edu.in/undergraduate/financial-aid",
+        "category": "UNIVERSITY",
+        "description": "Azim Premji University need-based financial assistance and scholarships.",
+        "scrape_depth": 2,
+    },
+    {
+        "name": "Aditya Birla Scholarships",
+        "base_url": "https://www.adityabirlascholars.net/",
+        "category": "CORPORATE_CSR",
+        "description": "Aditya Birla Group scholarships for premier engineering and management students.",
+        "scrape_depth": 2,
+    },
     # 6. Aggregator (Discovery feed only - requires primary source)
     {
         "name": "Buddy4Study Featured Portal",
@@ -164,14 +221,14 @@ def init_db() -> None:
     except Exception:
         pass
 
-    # Populate default seed sources if not present
+    # Populate default seed sources if not present (idempotent upsert)
     db: Session = SessionLocal()
     try:
-        existing_count = db.query(SeedSource).count()
-        if existing_count == 0:
-            for seed in DEFAULT_SEEDS:
+        for seed in DEFAULT_SEEDS:
+            exists = db.query(SeedSource).filter_by(base_url=seed["base_url"]).first()
+            if not exists:
                 record = SeedSource(**seed)
                 db.add(record)
-            db.commit()
+        db.commit()
     finally:
         db.close()

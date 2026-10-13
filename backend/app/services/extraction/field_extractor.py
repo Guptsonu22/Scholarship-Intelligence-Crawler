@@ -348,7 +348,7 @@ class FieldExtractor:
                 continue
             if re.search(r"scholarship|fellowship|scheme|yojana|grant|award|financial\s+aid|studentship", t, re.I):
                 # Filter out generic menu / footer headings
-                if not re.search(r"footer|menu|latest\s+news|general\s+instructions|navigation|home|quick\s+links", t, re.I):
+                if not re.search(r"footer|menu|latest\s+news|general\s+instructions|navigation|home|quick\s+links|total\s+schemes|all\s+schemes|useful\s+links|important\s+links", t, re.I):
                     name_candidate = t
                     selector = h.name
                     break
@@ -360,8 +360,13 @@ class FieldExtractor:
                 name_candidate = clean_title
                 selector = "title"
 
-        # Known profile fallback if heading was generic
-        if (not name_candidate or len(name_candidate) < 6 or "general instructions" in name_candidate.lower()) and profile_key:
+        # Known profile fallback if heading was generic or non-specific
+        is_generic_name = (
+            not name_candidate
+            or len(name_candidate) < 6
+            or any(g in name_candidate.lower() for g in ["general instructions", "total schemes", "fees & financial aid", "overview", "schemes", "scholarships"])
+        )
+        if is_generic_name and profile_key and profile_key in cls.KNOWN_SCHEME_PROFILES:
             profile = cls.KNOWN_SCHEME_PROFILES[profile_key]
             name_candidate = profile["name"]
             selector = "official_scheme_profile"
@@ -438,6 +443,7 @@ class FieldExtractor:
                 return
 
         # 3. Direct text search for known providers
+        full_text = soup.get_text(separator=" ", strip=True)
         for provider in cls.KNOWN_PROVIDERS:
             if re.search(r"\b" + re.escape(provider) + r"\b", full_text, re.I):
                 data.provider = provider
