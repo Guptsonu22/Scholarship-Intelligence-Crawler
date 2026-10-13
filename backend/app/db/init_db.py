@@ -11,6 +11,7 @@ from app.db.models import (
     Scholarship,
     FieldEvidence,
     ExtractionRun,
+    VerificationRecord,
 )
 
 DEFAULT_SEEDS = [
@@ -136,11 +137,27 @@ def init_db() -> None:
     # Safe column migration check for SQLite
     try:
         with engine.connect() as conn:
+            # crawl_attempts
             res = conn.execute(text("PRAGMA table_info(crawl_attempts)"))
             cols = [row[1] for row in res.fetchall()]
             if cols and "raw_html" not in cols:
                 conn.execute(text("ALTER TABLE crawl_attempts ADD COLUMN raw_html TEXT"))
-                conn.commit()
+
+            # scholarships
+            res = conn.execute(text("PRAGMA table_info(scholarships)"))
+            cols = [row[1] for row in res.fetchall()]
+            if cols and "verification_status" not in cols:
+                conn.execute(text("ALTER TABLE scholarships ADD COLUMN verification_status VARCHAR(50) DEFAULT 'UNVERIFIED'"))
+            if cols and "confidence_score" not in cols:
+                conn.execute(text("ALTER TABLE scholarships ADD COLUMN confidence_score FLOAT"))
+
+            # field_evidence
+            res = conn.execute(text("PRAGMA table_info(field_evidence)"))
+            cols = [row[1] for row in res.fetchall()]
+            if cols and "quality_rating" not in cols:
+                conn.execute(text("ALTER TABLE field_evidence ADD COLUMN quality_rating VARCHAR(50) DEFAULT 'SUPPORTED'"))
+
+            conn.commit()
     except Exception:
         pass
 

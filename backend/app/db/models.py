@@ -181,6 +181,14 @@ class Scholarship(Base):
     extraction_method = Column(String(50), default="DETERMINISTIC_DOM", nullable=False)
     validation_warnings = Column(Text, nullable=True)  # JSON-encoded array of warnings
 
+    verification_status = Column(
+        String(50),
+        default="UNVERIFIED",
+        nullable=False,
+        index=True,
+    )  # UNVERIFIED, VERIFIED, REVIEW_REQUIRED, NO_LONGER_VERIFIABLE
+    confidence_score = Column(Float, nullable=True)
+
     candidate_id = Column(Integer, ForeignKey("candidate_urls.id"), nullable=True, index=True)
     crawl_attempt_id = Column(Integer, ForeignKey("crawl_attempts.id"), nullable=True, index=True)
 
@@ -189,6 +197,12 @@ class Scholarship(Base):
         "FieldEvidence",
         back_populates="scholarship",
         cascade="all, delete-orphan",
+    )
+    verification_records = relationship(
+        "VerificationRecord",
+        back_populates="scholarship",
+        cascade="all, delete-orphan",
+        order_by="desc(VerificationRecord.verified_at)",
     )
 
 
@@ -209,9 +223,36 @@ class FieldEvidence(Base):
     extraction_method = Column(String(50), default="DETERMINISTIC_DOM", nullable=False)
     html_selector = Column(String(255), nullable=True)
     validation_status = Column(String(50), default="VALID", nullable=False)  # VALID, SUSPICIOUS, UNVERIFIED
+    quality_rating = Column(
+        String(50),
+        default="SUPPORTED",
+        nullable=False,
+    )  # SUPPORTED, WEAK_EVIDENCE, NOT_FOUND, CONFLICTING, STALE
 
     scholarship = relationship("Scholarship", back_populates="evidence_records")
     candidate = relationship("CandidateURL", back_populates="evidence_records")
+
+
+class VerificationRecord(Base):
+    """Audit record and detailed outcome of deterministic verification runs."""
+    __tablename__ = "verification_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scholarship_id = Column(Integer, ForeignKey("scholarships.id", ondelete="CASCADE"), nullable=False, index=True)
+    confidence_score = Column(Float, nullable=False)  # 0.0 to 100.0
+    verification_status = Column(String(50), nullable=False, index=True)  # VERIFIED, REVIEW_REQUIRED, NO_LONGER_VERIFIABLE
+    lifecycle_status = Column(String(50), nullable=False, index=True)  # ACTIVE, EXPIRING_SOON, EXPIRED, PENDING_VERIFICATION, NO_LONGER_VERIFIABLE
+    scoring_model_version = Column(String(50), default="v1.0-deterministic", nullable=False)
+
+    scoring_breakdown = Column(Text, nullable=False)  # JSON {criterion: {points: float, max_points: float, explanation: str}}
+    gate_results = Column(Text, nullable=False)  # JSON {gate_name: {status: PASS/FAIL/NOT_APPLICABLE, explanation: str, evidence_refs: list, evaluated_at: str}}
+    deductions_reasons = Column(Text, nullable=False)  # JSON list of str
+    evidence_references = Column(Text, nullable=True)  # JSON list of dicts {field: str, status: str, snippet: str}
+    is_latest = Column(Boolean, default=True, nullable=False, index=True)
+    verified_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    scholarship = relationship("Scholarship", back_populates="verification_records")
+
 
 
 class ExtractionRun(Base):
