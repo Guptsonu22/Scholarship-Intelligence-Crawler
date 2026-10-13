@@ -47,7 +47,7 @@ class DateParser:
         if not text:
             return None, None
 
-        # 1. Search near explicit deadline keywords first
+        # 1. Search near explicit deadline keywords
         for pattern in DEADLINE_CONTEXT_PATTERNS:
             match = pattern.search(text)
             if match:
@@ -55,17 +55,6 @@ class DateParser:
                 date_str = cls.extract_first_date(snippet)
                 if date_str:
                     return date_str, snippet[:200]
-
-        # 2. General search across text for any valid date
-        date_str = cls.extract_first_date(text)
-        if date_str:
-            # Locate snippet around the found date
-            pos = text.find(date_str)
-            if pos != -1:
-                start = max(0, pos - 40)
-                end = min(len(text), pos + len(date_str) + 40)
-                return date_str, text[start:end].strip()
-            return date_str, date_str
 
         return None, None
 
