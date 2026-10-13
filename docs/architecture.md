@@ -8,108 +8,92 @@ The **Scholarship Intelligence Crawler** is an automated, reliable system design
 graph TD
     subgraph UI [Frontend Layer]
         Dashboard[React + TypeScript + Vite Dashboard]
+        EvidenceModal[Traceable Evidence Inspector]
     end
 
     subgraph API [FastAPI Backend Layer]
         HealthRoute[GET /api/health]
         DiscoveryRoutes[GET /api/discovery/sources<br/>POST /api/discovery/run<br/>GET /api/discovery/candidates]
         CrawlRoutes[GET /api/crawl/runs<br/>POST /api/crawl/run<br/>GET /api/crawl/candidates/:id]
+        ExtractionRoutes[POST /api/extraction/run<br/>GET /api/extraction/runs<br/>GET /api/scholarships<br/>GET /api/scholarships/:id<br/>GET /api/scholarships/:id/evidence]
     end
 
-    subgraph CoreServices [Core Discovery & Ethical Crawling Engine]
-        Discovery[Discovery Service: Multi-Seed Scanning & Deduplication]
-        Classifier[Source Classifier: Government, University, CSR, Trust, Aggregator]
-        Normalizer[URL Normalizer: Fragment Removal, Query Cleaning, Relevance Heuristics]
-        Crawler[Crawler Service: Polite Throttling, Max Size, Content Type Safeguards]
-        Security[Security Layer: SSRF Prevention, DNS Resolution, Private Subnet Blocking]
-        Robots[Robots.txt Policy Manager: Per-Domain Caching & Compliance]
+    subgraph CoreServices [Core Extraction & Intelligence Engine]
+        Assessor[1. Page Assessor: SCHOLARSHIP_DETAIL vs LISTING vs PORTAL]
+        Extractor[2. Field Extractor: Title, Provider, Eligibility, Dates, Amount, Docs]
+        DateParser[3. Date Parser: Indian & ISO formats]
+        AmountParser[4. Amount Parser: Rupees, Lakhs, Fee Waivers]
+        EvidenceEngine[5. Evidence Engine: Verbatim HTML Snippets & Traceability]
+        Classifier[6. Source Classifier: Government, University, CSR, Trust, Aggregator]
+        Crawler[7. Ethical Crawler: SSRF Guard, Robots Policy, Domain Throttling]
     end
 
     subgraph Storage [Storage Layer]
         SQLite[(Persistent SQLite Database: data/scholarships.db)]
-        SeedTable[seed_sources]
+        SchTable[scholarships]
+        EvTable[field_evidence]
+        RunsTable[extraction_runs]
         CandTable[candidate_urls]
-        ClassTable[source_classifications]
-        RunsTable[crawl_runs]
         AttemptsTable[crawl_attempts]
     end
 
     Dashboard <-->|REST API / JSON| API
-    DiscoveryRoutes --> Discovery
-    CrawlRoutes --> Crawler
-    Discovery --> Normalizer
-    Discovery --> Classifier
-    Discovery --> Crawler
-    Crawler --> Security
-    Crawler --> Robots
-    Crawler --> Storage
-    Discovery --> Storage
+    Dashboard --> EvidenceModal
+    ExtractionRoutes --> Extractor
+    Extractor --> Assessor
+    Extractor --> DateParser
+    Extractor --> AmountParser
+    Extractor --> EvidenceEngine
+    EvidenceEngine --> Storage
+    Extractor --> Storage
 ```
 
 ---
 
-## 2. Implemented Architecture (Phases 1 & 2)
+## 2. Extraction & Field-Level Evidence Pipeline (Phase 3)
 
-### A. Discovery Engine (`backend/app/services/discovery/`)
-- **`url_normalizer.py`**:
-  - Resolves relative URLs to canonical absolute links.
-  - Strips URL fragments (`#...`).
-  - Strips ad/tracking query parameters (`utm_*`, `ref`, `fbclid`, `gclid`, etc.) while retaining functional query arguments.
-  - Collapses redundant slashes and standardizes trailing slashes.
-  - Filters out binary file extensions (`.pdf`, `.docx`, `.zip`, `.jpg`, etc.).
-  - Calculates scholarship relevance heuristics [0.0 - 1.0] by inspecting URL slugs, anchor text, and context against weighted keywords (`scholarship`, `fellowship`, `stipend`, `yojana`, `medhabruti`, `vidyasaarathi`, `post-matric`, `pre-matric`, `eligibility`, `apply`).
-- **`discovery_service.py`**:
-  - Extracts candidate links from HTML pages via BeautifulSoup.
-  - Implements database-backed deduplication on `normalized_url`.
-  - Records discovery method (`SEED_PORTAL`, `INTERNAL_LINK`, `AGGREGATOR_LINK`), source URL, relevance score, and classification.
+### A. End-to-End Extraction Flow
+`Discovered candidate → Crawled HTML → Page assessment → Field extraction → Evidence attachment → Schema validation → Persistent database record`
 
-### B. Ethical Crawler & Security Layer (`backend/app/services/crawling/`)
-- **`security.py`**:
-  - **SSRF Prevention**: Validates URL scheme (strictly `http` and `https`).
-  - Resolves domain hostnames via DNS and checks all resulting IP addresses against restricted CIDR blocks:
-    - Loopback (`127.0.0.0/8`, `::1/128`)
-    - Private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`)
-    - Link-local and cloud metadata IPs (`169.254.0.0/16`, `169.254.169.254`, `metadata.google.internal`)
-    - Carrier-grade NAT (`100.64.0.0/10`)
-    - Multicast & broadcast (`224.0.0.0/4`, `255.255.255.255`)
-- **`robots.py`**:
-  - Per-domain caching and parsing of `robots.txt` using `urllib.robotparser.RobotFileParser`.
-- **`http_client.py`**:
-  - Configurable timeouts (default 15s) and User-Agent identification.
-  - Exponential backoff retries on transient errors.
-  - Per-domain rate limiting (minimum 2.0s delay between requests to same domain).
-  - Manual step-by-step redirect inspection ensuring redirect destinations do not bypass SSRF checks.
-  - Response size safeguards (aborts streaming if body exceeds 5MB).
-  - Content-Type enforcement (accepts only `text/html`, `application/xhtml+xml`).
-  - SHA-256 content hashing of fetched HTML for audit trail integrity.
-- **`crawler_service.py`**:
-  - Orchestrates crawls on candidate URLs.
-  - Records detailed `CrawlAttempt` logs (HTTP status, response time ms, content length, SHA-256 hash, error reasons).
-  - Automatically transitions candidates from `DISCOVERED`/`QUEUED` to `CRAWLED` or `FAILED`.
-  - Recursively extracts secondary links from successfully crawled pages.
+1. **Page Assessment (`PageAssessor`)**:
+   - Classifies page structure before extraction:
+     - `SCHOLARSHIP_DETAIL`: Individual scholarship page containing title and specific scheme attributes.
+     - `SCHOLARSHIP_LISTING`: Multi-scholarship directory or portal index.
+     - `APPLICATION_PORTAL`: User login / OTR registration / password screens (rejected from becoming scholarship records).
+     - `GENERIC_PAGE`: Generic portal homepages or about pages.
+     - `INSUFFICIENT_EVIDENCE`: Pages lacking minimum verifiable criteria.
+     - `FETCH_FAILED`: Empty, blocked, or network failure pages.
 
-### C. Source Classification Engine (`backend/app/services/verification/source_classifier.py`)
-Deterministic classification distinguishing:
-1. **`CENTRAL_GOVERNMENT`**: Apex government domains (`.gov.in`, `.nic.in`) and statutory bodies (`ugc.gov.in`, `aicte-india.org`).
-2. **`STATE_GOVERNMENT`**: State portal subdomains (e.g., `*.karnataka.gov.in`, `*.maharashtra.gov.in`, `*.up.gov.in`).
-3. **`UNIVERSITY`**: Recognized university domains (`.ac.in`, `.edu.in`).
-4. **`CORPORATE_CSR`**: Verified corporate CSR programs (`reliancefoundation.org`, `tatatrusts.org`, `ongcfoundation.org`, `infosys.org`, `hdfcbank.com`).
-5. **`TRUST_FOUNDATION`**: Registered philanthropic trusts (`kcmet.org`, `nsfoundation.co.in`, `sitaramjindalfoundation.org`, `inlaksfoundation.org`).
-6. **`AGGREGATOR`**: Scholarship listings and discovery feeds (`buddy4study.com`, `scholarshipsinindia.com`); designated as discovery feeds requiring primary source resolution.
-7. **`UNKNOWN`**: Unverified domains requiring manual review.
+2. **Deterministic Field Extraction (`FieldExtractor`)**:
+   - **Scholarship Name**: Extracted from `<h1>`, `<h2>`, or `<title>` tag with site brand noise stripped.
+   - **Provider Organization**: Identified against verified authority dictionaries (e.g. "Ministry of Social Justice and Empowerment", "AICTE", "UGC", "Reliance Foundation").
+   - **Financial Benefit**: RegEx parsing for currency amounts (`₹50,000`, `Rs. 50,000`, `INR 2.5 Lakhs`, `per annum`, `monthly stipend`) and in-kind benefits (`100% Tuition Fee Waiver`).
+   - **Dates & Deadlines**: Parses Indian formats (`DD/MM/YYYY`, `DD-MM-YYYY`, `DD Month YYYY`) with contextual boundary matching.
+   - **Eligibility & Academic Criteria**: Extracts education levels, income thresholds (e.g. `< ₹2.5 Lakhs`), gender specifications, and category reservations (`SC`, `ST`, `OBC`, `PwD`).
+   - **Application URLs**: Safely extracted and SSRF-checked.
+   - **Anti-Hallucination Policy**: Fields with no supporting evidence remain strictly `None`/null and are displayed as *"Not specified"* in the user interface.
 
-Every classification retains an explicit explainable `classification_reason`, `is_official` boolean flag, and `trust_score`.
+3. **Field-Level Traceable Evidence (`field_evidence` table)**:
+   - For every extracted attribute, a distinct `FieldEvidence` row is persisted with:
+     - Exact `extracted_value`
+     - Verbatim `evidence_text` snippet from source HTML
+     - Source URL and page title
+     - SHA-256 `content_hash` of the fetched page
+     - DOM selector or element tag path
+     - Validation status (`VALID`)
+   - Allows full audit trace:
+     `Scholarship record → Extracted field → Evidence record → Original official URL → Content Hash`.
 
 ---
 
-## 3. Data Models (`backend/app/db/models.py`)
+## 3. Database Schema (`backend/app/db/models.py`)
 
-- `SeedSource`: Configured portal entrypoints.
-- `CandidateURL`: Discovered candidate URLs with relevance score, status, and discovery source.
-- `SourceClassification`: Domain classifications, trust scores, and reasons.
-- `CrawlRun`: Audit session logging for discovery and crawl runs.
-- `CrawlAttempt`: Individual HTTP attempt record with timing, status, content hash, and error diagnostics.
-- `SystemInfo`: Migration and system configuration tracking.
+- `scholarships`: Structured opportunities with `stable_id`, `name`, `provider`, `official_source_url`, `amount_benefit`, `closing_date`, `course_level`, `income_criteria`, `lifecycle_status`, `page_type`, and `content_hash`.
+- `field_evidence`: Verbatim snippets linked to individual fields and parent scholarship records.
+- `extraction_runs`: Audit history of extraction sessions with scanned, extracted, insufficient, and failure counts.
+- `candidate_urls`: Discovered candidate links and relevance scores.
+- `crawl_attempts`: HTTP fetch results with SHA-256 content hashes and raw HTML snapshots.
+- `seed_sources`: Configured authentic portal entrypoints.
 
 ---
 
@@ -117,6 +101,6 @@ Every classification retains an explicit explainable `classification_reason`, `i
 
 - [x] **Phase 1**: Project Foundation, SQLite database, FastAPI backend, React/Vite/TS dashboard, configuration, test suite.
 - [x] **Phase 2**: Real Scholarship Discovery, Ethical HTTP Crawling, SSRF Protection, Robots.txt, Source Classifier, Candidate Extraction, and Crawl History Audit Trail.
-- [ ] **Phase 3**: Deterministic Scholarship Field Extraction (Title, Provider, Eligibility, Award Amount, Deadline, Official URL, and Field-Level Verbatim Evidence).
+- [x] **Phase 3**: Deterministic Scholarship Field Extraction (Title, Provider, Eligibility, Award Amount, Deadline, Official URL, and Field-Level Verbatim Evidence).
 - [ ] **Phase 4**: Deterministic Confidence & Verification Engine (Strict ≥95% confidence threshold for VERIFIED status).
 - [ ] **Phase 5**: Lifecycle Change Detection (Active, Stale, Expired), Diff Auditing, Full Interactive Dashboard, and Benchmark Evaluation.

@@ -11,8 +11,9 @@
 - **Database**: SQLite (persistent local storage under `data/scholarships.db`)
 - **Frontend**: React + TypeScript + Vite
 - **Crawling & Discovery**: Requests, BeautifulSoup4, SSRF Security Guard, Robots.txt Policy Manager, Domain Throttling
+- **Extraction Engine**: Deterministic DOM parser, Indian date parser, monetary benefit parser, page classifier (`SCHOLARSHIP_DETAIL`, `LISTING`, `APPLICATION_PORTAL`, `GENERIC_PAGE`), and field-level evidence tracker
 - **Validation**: Pydantic v2
-- **Testing**: Pytest (38 automated tests covering discovery, security, classifiers, and endpoints)
+- **Testing**: Pytest (59 automated tests covering extraction, dates, amounts, page assessors, discovery, security, and endpoints)
 
 ---
 
@@ -27,7 +28,7 @@
 │   └── architecture.md              # Detailed architecture documentation
 ├── frontend/                        # React + TypeScript + Vite application
 │   ├── src/
-│   │   ├── App.tsx                  # Dashboard interface & live candidate explorer
+│   │   ├── App.tsx                  # Dashboard interface & evidence inspector
 │   │   ├── App.css                  # UI styling
 │   │   └── main.tsx
 │   ├── package.json
@@ -40,18 +41,21 @@
     │   ├── core/config.py           # Configuration & environment variables
     │   ├── db/
     │   │   ├── database.py          # SQLite engine & session factory
-    │   │   ├── models.py            # SQLAlchemy models (SeedSource, CandidateURL, CrawlAttempt, etc.)
-    │   │   └── init_db.py           # Table initialization & default seeds
+    │   │   ├── models.py            # Models (Scholarship, FieldEvidence, CandidateURL, etc.)
+    │   │   └── init_db.py           # Table initialization & safe migrations
     │   ├── api/routes/
     │   │   ├── health.py            # GET /api/health
     │   │   ├── discovery.py         # /api/discovery/sources, /run, /candidates
-    │   │   └── crawl.py             # /api/crawl/runs, /run, /candidates/{id}
+    │   │   ├── crawl.py             # /api/crawl/runs, /run, /candidates/{id}
+    │   │   ├── scholarships.py      # /api/scholarships, /{id}, /{id}/evidence
+    │   │   └── extraction.py        # /api/extraction/run, /runs
     │   ├── models/schemas.py        # Pydantic request/response schemas
     │   └── services/
     │       ├── discovery/           # Candidate discovery & URL normalization
     │       ├── crawling/            # Ethical HTTP crawler, SSRF guard & robots.txt
+    │       ├── extraction/          # Deterministic field extraction & evidence engine
     │       └── verification/        # Source classifier with explainable reasons
-    └── tests/                       # Automated backend tests (38 tests)
+    └── tests/                       # Automated backend tests (59 tests)
 ```
 
 ---
@@ -62,37 +66,27 @@
 - Python 3.12+ (Python 3.14 supported)
 - Node.js 18+ and npm
 
-### 1. Clone & Environment Configuration
-
-Open Windows PowerShell in the project root:
+### 1. Backend Setup & Virtual Environment
 
 ```powershell
-Copy-Item .env.example .env
-```
-
-### 2. Backend Setup & Virtual Environment
-
-```powershell
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv backend/.venv
-
-# Activate virtual environment
 .\backend\.venv\Scripts\Activate.ps1
 
 # Install dependencies
 pip install -r backend/requirements.txt
 ```
 
-### 3. Run Automated Tests
+### 2. Run Automated Tests
 
-Execute the 38-test pytest suite validating security, crawling, discovery, database, and API endpoints:
+Execute the 59-test pytest suite validating field extraction, date parsing, amounts, page classification, evidence linking, security, and APIs:
 
 ```powershell
 $env:PYTHONPATH="backend;backend/app"
 .\backend\.venv\Scripts\python.exe -m pytest backend/tests
 ```
 
-### 4. Start the Backend API
+### 3. Start the Backend API
 
 ```powershell
 $env:PYTHONPATH="backend;backend/app"
@@ -100,28 +94,26 @@ $env:PYTHONPATH="backend;backend/app"
 ```
 
 - **Health Endpoint**: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
+- **Scholarships API**: [http://127.0.0.1:8000/api/scholarships](http://127.0.0.1:8000/api/scholarships)
 - **API Documentation (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Candidate URLs API**: [http://127.0.0.1:8000/api/discovery/candidates](http://127.0.0.1:8000/api/discovery/candidates)
-- **Seed Sources API**: [http://127.0.0.1:8000/api/discovery/sources](http://127.0.0.1:8000/api/discovery/sources)
 
-### 5. Run a Discovery or Crawl Operation via PowerShell
-
-You can trigger discovery and crawling directly via PowerShell `Invoke-RestMethod`:
+### 4. Run Discovery & Extraction via PowerShell
 
 ```powershell
-# Trigger a discovery run across top 3 seed sources
+# 1. Trigger candidate discovery across seed sources
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/discovery/run" -Method Post -ContentType "application/json" -Body '{"max_seeds": 3, "respect_robots": false}'
 
-# List discovered candidates
-(Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/discovery/candidates?page=1&page_size=10").items | Format-Table id, source_category, relevance_score, normalized_url
+# 2. Trigger deterministic extraction on candidates
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/extraction/run" -Method Post -ContentType "application/json" -Body '{"max_candidates": 10}'
 
-# Trigger a crawl run on queued candidates
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/crawl/run" -Method Post -ContentType "application/json" -Body '{"max_pages": 3}'
+# 3. List extracted structured scholarships
+(Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/scholarships").items | Format-Table id, name, provider, closing_date, amount_benefit
+
+# 4. Inspect field-level evidence for scholarship #1
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/scholarships/1/evidence" | Format-Table field_name, extracted_value, html_selector
 ```
 
-### 6. Start the Frontend Dashboard
-
-In a separate Windows PowerShell window:
+### 5. Start the Frontend Dashboard
 
 ```powershell
 cd frontend
@@ -133,13 +125,12 @@ npm run dev
 
 ---
 
-## Phase 2 Implementation Summary
+## Phase 3 Implementation Summary
 
-- [x] **Configurable Seed Portals**: 15 authentic seed sources across Central Government, State Government, Universities, Corporate CSR, Trusts, and Aggregators.
-- [x] **SSRF Security Protection**: Blocks loopback, RFC 1918 private subnets, cloud metadata IPs (`169.254.169.254`), non-HTTP schemes, and unsafe redirects.
-- [x] **Ethical Crawling**: Robots.txt compliance, per-domain rate limiting, max response size safeguards (5MB), and Content-Type enforcement (`text/html`).
-- [x] **URL Normalization & Relevance Scoring**: Strips fragments, cleans tracking parameters, filters binary downloads, and scores scholarship keyword relevance.
-- [x] **Deterministic Source Classification**: Classifies sources with explainable reasons and confidence trust scores.
-- [x] **Audit History**: Records `CrawlRun` and `CrawlAttempt` with SHA-256 content hashes, HTTP status codes, and timing.
-- [x] **Real Discovery Verified**: Successfully extracted 53 genuine candidates from live portals into SQLite with zero duplicate insertions on repeated runs.
-- [x] **Comprehensive Testing**: 38 automated pytest tests passing cleanly.
+- [x] **Structured Schema**: `Scholarship` model storing stable ID, name, provider, dates, amounts, eligibility, categories, documents, and lifecycle status.
+- [x] **Field-Level Traceable Evidence**: `FieldEvidence` table capturing verbatim source text snippets, DOM selectors, source URLs, content hashes, and timestamps.
+- [x] **Page Assessment Engine**: Distinguishes `SCHOLARSHIP_DETAIL` from `SCHOLARSHIP_LISTING`, `APPLICATION_PORTAL`, `GENERIC_PAGE`, and `INSUFFICIENT_EVIDENCE`.
+- [x] **Zero Hallucination Policy**: Missing values remain strictly null/None and display as *"Not specified"*. No invented dates or amounts.
+- [x] **Deterministic Parsers**: Indian date parser, monetary/benefit expression parser, education level and reservation category extractors.
+- [x] **Interactive Evidence Explorer**: Frontend modal displaying full verbatim textual snippets and DOM selector provenance for every extracted attribute.
+- [x] **59/59 Automated Tests**: Comprehensive pytest suite passing with zero failures.
