@@ -344,11 +344,11 @@ export default function App() {
   return (
     <div className="container">
       <header className="header">
-        <div className="badge">EDXSO Assignment 2 • Phase 5 Recrawling, Change Detection & Lifecycle</div>
+        <div className="badge">EDXSO Assignment 2 • Phase 6 Real Scholarship Coverage & Official-Source Verification</div>
         <h1>Scholarship Intelligence Crawler</h1>
         <p className="subtitle">
-          Automated ethical recrawling, deterministic field-level change detection, preserved historical observations,
-          and lifecycle transition management.
+          Comprehensive scholarship coverage across Central & State Government, Universities, and Corporate CSR with
+          traceable evidence trails, deterministic verification gates, and lifecycle tracking.
         </p>
       </header>
 

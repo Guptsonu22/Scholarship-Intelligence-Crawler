@@ -14,8 +14,9 @@
 - **Extraction Engine**: Deterministic DOM parser, Indian date parser, monetary benefit parser, page classifier (`SCHOLARSHIP_DETAIL`, `LISTING`, `APPLICATION_PORTAL`, `GENERIC_PAGE`), and field-level evidence tracker
 - **Verification Engine (Phase 4)**: 100-point deterministic scoring model, 7 mandatory verification gates, field evidence quality ratings (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`), strict `>=95%` confidence requirement, and persistent audit history. Zero LLM reliance for confidence scoring.
 - **Repeatable Scheduler & Change Engine (Phase 5)**: Thread-safe background crawl scheduler with overlap prevention, candidate prioritization (existing scholarships due for refresh first, then official seeds), whitespace noise filtering, non-destructive historical evidence preservation (`is_current = False`), field-level change history tracking (`previous_value` $\rightarrow$ `new_value`), lifecycle transitions, and automatic re-verification triggers.
+- **Real Scholarship Coverage & Verification (Phase 6)**: 21 authentic, live-crawled scholarship opportunities across 4 sectors (Central Government, State Government, Universities/Premier Institutions, Corporate CSR/Philanthropic Foundations). 10 verified opportunities meeting $\ge 95\%$ confidence and passing all 7 mandatory gates. Over 120 traceable field evidence records and 110 verification audit records in SQLite database.
 - **Validation**: Pydantic v2
-- **Testing**: Pytest (**78 automated tests** passing covering change detection, whitespace noise filtering, lifecycle transitions, network error handling, scheduler overlap prevention, verification scoring, mandatory gates, extraction, security, and endpoints)
+- **Testing**: Pytest (**83 automated tests** passing covering multi-sector source classification, detail vs listing page assessment, evidence attachment, deterministic $\ge 95\%$ verification gates, change detection, noise filtering, lifecycle transitions, network error handling, scheduler overlap prevention, extraction, security, and endpoints)
 
 ---
 

@@ -143,7 +143,7 @@ class SourceClassifier:
                 category="UNIVERSITY",
                 is_official=True,
                 trust_score=0.95,
-                reason="Official Indian accredited university / academic institution domain.",
+                reason="Official Indian accredited university / academic institution domain (.ac.in / .edu.in).",
             )
 
         # 4. Corporate CSR Programs

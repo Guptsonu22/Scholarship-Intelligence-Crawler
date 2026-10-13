@@ -61,14 +61,29 @@ TARGET_SCHOLARSHIPS = [
         "anchor": "AICTE Yashasvi Scholarship Scheme for Core Technical Branches",
     },
     {
-        "url": "https://online-inspire.gov.in/",
+        "url": "https://www.aicte-india.org/bureaus/jk",
         "category": "CENTRAL_GOVERNMENT",
-        "anchor": "DST INSPIRE Fellowship Scheme for Higher Education",
+        "anchor": "AICTE Prime Minister's Special Scholarship Scheme (PMSSS) for J&K and Ladakh",
     },
     {
-        "url": "https://csirhrdg.res.in/",
+        "url": "https://csirhrdg.res.in/Home/Index/1/Default/1749/58",
         "category": "CENTRAL_GOVERNMENT",
         "anchor": "CSIR Junior Research Fellowship (JRF-NET) and SRF Scheme",
+    },
+    {
+        "url": "https://csirhrdg.res.in/Home/Index/1/InPage/52/24/37",
+        "category": "CENTRAL_GOVERNMENT",
+        "anchor": "CSIR Partial Financial Assistance Scheme for Young Scientists",
+    },
+    {
+        "url": "https://www.ugc.gov.in/page/Scholarships-and-Fellowships.aspx",
+        "category": "CENTRAL_GOVERNMENT",
+        "anchor": "UGC Post-Graduate Indira Gandhi Scholarship for Single Girl Child",
+    },
+    {
+        "url": "https://overseas.tribal.gov.in/",
+        "category": "CENTRAL_GOVERNMENT",
+        "anchor": "National Overseas Scholarship for Scheduled Tribe (ST) Students",
     },
 
     # --- 2. State Government ---
@@ -78,24 +93,9 @@ TARGET_SCHOLARSHIPS = [
         "anchor": "West Bengal OASIS Pre-Matric and Post-Matric Scholarship Scheme",
     },
     {
-        "url": "https://harchhatravratti.highereduhry.ac.in/",
+        "url": "https://sje.rajasthan.gov.in/Default.aspx?PageID=346",
         "category": "STATE_GOVERNMENT",
-        "anchor": "Department of Higher Education Haryana Har-Chhatravratti Post-Matric Scholarship",
-    },
-    {
-        "url": "https://scholarship.odisha.gov.in/website/home",
-        "category": "STATE_GOVERNMENT",
-        "anchor": "Odisha State e-Medhabruti / Biju Yuba Sashaktikaran Scholarship",
-    },
-    {
-        "url": "https://mahadbt.maharashtra.gov.in/SchemeData/SchemeData?str=E9DDFA370C054D318D68755018693740",
-        "category": "STATE_GOVERNMENT",
-        "anchor": "MahaDBT Rajarshi Chhatrapati Shahu Maharaj Shikshan Shulkh Shishyavrutti Yojna",
-    },
-    {
-        "url": "https://ssp.postmatric.karnataka.gov.in/",
-        "category": "STATE_GOVERNMENT",
-        "anchor": "Karnataka State Scholarship Portal (SSP) Post-Matric Scholarship",
+        "anchor": "Rajasthan Social Justice Post-Matric Scholarship Scheme for SC/ST/SBC/OBC",
     },
 
     # --- 3. Universities & Premier Institutions ---
@@ -110,14 +110,14 @@ TARGET_SCHOLARSHIPS = [
         "anchor": "Azim Premji University Need-Based Financial Aid and Scholarship",
     },
     {
-        "url": "https://www.bitsadmission.com/fdfees202425.aspx",
+        "url": "https://www.iitbbs.ac.in/scholarship.php",
         "category": "UNIVERSITY",
-        "anchor": "BITS Pilani Institute Merit and Merit-cum-Means Scholarships",
+        "anchor": "IIT Bhubaneswar Merit-cum-Means (MCM) Scholarship and Tuition Fee Remission",
     },
     {
-        "url": "https://iitgn.ac.in/admissions/financial_aid",
+        "url": "https://www.bitsadmission.com/",
         "category": "UNIVERSITY",
-        "anchor": "IIT Gandhinagar Financial Aid and Tuition Fee Waivers",
+        "anchor": "BITS Pilani Institute Merit and Merit-cum-Means Scholarships",
     },
 
     # --- 4. Corporate CSR & Philanthropic Trusts ---
