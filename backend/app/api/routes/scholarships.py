@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.db.database import get_db
-from app.db.models import Scholarship, FieldEvidence
+from app.db.models import Scholarship, FieldEvidence, ScholarshipChangeHistory
 from app.models.schemas import (
     ScholarshipSchema,
     ScholarshipDetailSchema,
     ScholarshipListResponse,
     FieldEvidenceSchema,
     ScholarshipVerificationDetailResponse,
+    ScholarshipChangeHistorySchema,
 )
 
 router = APIRouter(prefix="/scholarships", tags=["Scholarships"])
@@ -179,4 +180,28 @@ def get_scholarship_verification(
         evidence_references=evidence_list,
         verified_at=latest_record.verified_at,
     )
+
+
+@router.get("/{scholarship_id}/changes", response_model=List[ScholarshipChangeHistorySchema])
+def get_scholarship_change_history(
+    scholarship_id: int,
+    db: Session = Depends(get_db),
+):
+    """Retrieve field-level change history for a specific scholarship."""
+    scholarship = db.query(Scholarship).filter(Scholarship.id == scholarship_id).first()
+    if not scholarship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scholarship #{scholarship_id} not found",
+        )
+
+    changes = (
+        db.query(ScholarshipChangeHistory)
+        .filter(ScholarshipChangeHistory.scholarship_id == scholarship_id)
+        .order_by(ScholarshipChangeHistory.detection_timestamp.desc())
+        .all()
+    )
+
+    return [ScholarshipChangeHistorySchema.model_validate(c) for c in changes]
+
 

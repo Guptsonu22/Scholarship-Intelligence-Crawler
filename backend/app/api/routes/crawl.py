@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -10,10 +10,17 @@ from app.models.schemas import (
     CrawlAttemptSchema,
     CrawlRunRequest,
     CrawlRunResponse,
+    SchedulerStatusResponse,
 )
-from app.services.crawling.crawler_service import CrawlerService
+from app.services.crawling.scheduler import scheduler
 
 router = APIRouter(prefix="/crawl", tags=["Crawl"])
+
+
+@router.get("/status", response_model=SchedulerStatusResponse)
+def get_crawl_status():
+    """Retrieve current crawl execution and scheduler status."""
+    return scheduler.get_status()
 
 
 @router.get("/runs", response_model=List[CrawlRunSchema])
@@ -57,19 +64,31 @@ def trigger_crawl_run(
     db: Session = Depends(get_db),
 ):
     """Triggers a controlled crawl run across queued or selected scholarship candidates."""
-    service = CrawlerService()
-    crawl_run = service.run_crawl_session(
+    res = scheduler.run_pipeline(
         db=db,
+        max_candidates=payload.max_pages,
         candidate_ids=payload.candidate_ids,
-        max_pages=payload.max_pages,
-        delay_seconds=payload.delay_seconds,
+        manual=True,
     )
 
+    if res.get("status") == "OVERLAPPING_REJECTED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=res["message"],
+        )
+
+    run_id = res.get("run_id", 0)
+    pages_crawled = res.get("pages_crawled", 0)
+    failed_fetches = res.get("failed_fetches", 0)
+    changes_detected = res.get("changes_detected", 0)
+    pages_unchanged = res.get("pages_unchanged", 0)
+
     return CrawlRunResponse(
-        run_id=crawl_run.id,
-        status=crawl_run.status,
-        message="Crawl run completed",
-        pages_attempted=crawl_run.pages_crawled + crawl_run.pages_failed,
-        pages_succeeded=crawl_run.pages_crawled,
-        pages_failed=crawl_run.pages_failed,
+        run_id=run_id,
+        status=res.get("status", "COMPLETED"),
+        message=f"Crawl run #{run_id} completed: {pages_crawled} crawled, {pages_unchanged} unchanged, {changes_detected} changes detected, {failed_fetches} failed.",
+        pages_attempted=pages_crawled + failed_fetches,
+        pages_succeeded=pages_crawled,
+        pages_failed=failed_fetches,
     )
+
