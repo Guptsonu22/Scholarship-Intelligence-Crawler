@@ -9,6 +9,7 @@ graph TD
     subgraph UI [Frontend Layer]
         Dashboard[React + TypeScript + Vite Dashboard]
         EvidenceModal[Traceable Evidence Inspector]
+        VerificationModal[Verification & Gate Audit Modal]
     end
 
     subgraph API [FastAPI Backend Layer]
@@ -16,22 +17,30 @@ graph TD
         DiscoveryRoutes[GET /api/discovery/sources<br/>POST /api/discovery/run<br/>GET /api/discovery/candidates]
         CrawlRoutes[GET /api/crawl/runs<br/>POST /api/crawl/run<br/>GET /api/crawl/candidates/:id]
         ExtractionRoutes[POST /api/extraction/run<br/>GET /api/extraction/runs<br/>GET /api/scholarships<br/>GET /api/scholarships/:id<br/>GET /api/scholarships/:id/evidence]
+        VerificationRoutes[POST /api/verification/run<br/>GET /api/verification/summary<br/>GET /api/verification/history/:id<br/>GET /api/scholarships/:id/verification]
+    end
+
+    subgraph VerificationEngine [Phase 4: Deterministic Verification Engine]
+        ScoringModel[100-Point Scoring Model: 7 Deterministic Criteria]
+        MandatoryGates[7 Mandatory Verification Gates]
+        EvidenceEvaluator[Evidence Quality Evaluator: SUPPORTED / WEAK / CONFLICTING / STALE]
+        AuditLogger[Audit History Logger: verification_records]
     end
 
     subgraph CoreServices [Core Extraction & Intelligence Engine]
-        Assessor[1. Page Assessor: SCHOLARSHIP_DETAIL vs LISTING vs PORTAL]
-        Extractor[2. Field Extractor: Title, Provider, Eligibility, Dates, Amount, Docs]
-        DateParser[3. Date Parser: Indian & ISO formats]
-        AmountParser[4. Amount Parser: Rupees, Lakhs, Fee Waivers]
-        EvidenceEngine[5. Evidence Engine: Verbatim HTML Snippets & Traceability]
-        Classifier[6. Source Classifier: Government, University, CSR, Trust, Aggregator]
-        Crawler[7. Ethical Crawler: SSRF Guard, Robots Policy, Domain Throttling]
+        Assessor[Page Assessor: SCHOLARSHIP_DETAIL vs LISTING vs PORTAL]
+        Extractor[Field Extractor: Title, Provider, Eligibility, Dates, Amount, Docs]
+        DateParser[Date Parser: Indian & ISO formats]
+        AmountParser[Amount Parser: Rupees, Lakhs, Fee Waivers]
+        Classifier[Source Classifier: Government, University, CSR, Trust, Aggregator]
+        Crawler[Ethical Crawler: SSRF Guard, Robots Policy, Domain Throttling]
     end
 
     subgraph Storage [Storage Layer]
         SQLite[(Persistent SQLite Database: data/scholarships.db)]
         SchTable[scholarships]
         EvTable[field_evidence]
+        VerTable[verification_records]
         RunsTable[extraction_runs]
         CandTable[candidate_urls]
         AttemptsTable[crawl_attempts]
@@ -39,68 +48,66 @@ graph TD
 
     Dashboard <-->|REST API / JSON| API
     Dashboard --> EvidenceModal
+    Dashboard --> VerificationModal
+    VerificationRoutes --> VerificationEngine
+    VerificationEngine --> ScoringModel
+    VerificationEngine --> MandatoryGates
+    VerificationEngine --> EvidenceEvaluator
+    VerificationEngine --> Storage
     ExtractionRoutes --> Extractor
-    Extractor --> Assessor
-    Extractor --> DateParser
-    Extractor --> AmountParser
-    Extractor --> EvidenceEngine
-    EvidenceEngine --> Storage
     Extractor --> Storage
 ```
 
 ---
 
-## 2. Extraction & Field-Level Evidence Pipeline (Phase 3)
+## 2. Phase 4: Deterministic Confidence Engine & Verification
 
-### A. End-to-End Extraction Flow
-`Discovered candidate → Crawled HTML → Page assessment → Field extraction → Evidence attachment → Schema validation → Persistent database record`
+### A. Core Verification Principles
+1. **Zero Hallucination Scoring**: The engine never uses LLMs or probabilistic heuristics to invent confidence numbers. Scores are 100% deterministic and reproducible from stored evidence.
+2. **Strict Verification Threshold**: A scholarship can be marked `VERIFIED` **only** when:
+   - Its computed score is $\ge 95.0\%$.
+   - **All 7 mandatory verification gates pass**.
+   - Official primary source is adequately established.
+   - Critical fields are supported by verified evidence.
+   - No unresolved critical contradiction exists.
+3. **Gate Dominance**: A score of $\ge 95\%$ alone **never overrides a failed verification gate**. Any failed gate immediately forces `REVIEW_REQUIRED`.
 
-1. **Page Assessment (`PageAssessor`)**:
-   - Classifies page structure before extraction:
-     - `SCHOLARSHIP_DETAIL`: Individual scholarship page containing title and specific scheme attributes.
-     - `SCHOLARSHIP_LISTING`: Multi-scholarship directory or portal index.
-     - `APPLICATION_PORTAL`: User login / OTR registration / password screens (rejected from becoming scholarship records).
-     - `GENERIC_PAGE`: Generic portal homepages or about pages.
-     - `INSUFFICIENT_EVIDENCE`: Pages lacking minimum verifiable criteria.
-     - `FETCH_FAILED`: Empty, blocked, or network failure pages.
+### B. 100-Point Deterministic Allocation Formula
 
-2. **Deterministic Field Extraction (`FieldExtractor`)**:
-   - **Scholarship Name**: Extracted from `<h1>`, `<h2>`, or `<title>` tag with site brand noise stripped.
-   - **Provider Organization**: Identified against verified authority dictionaries (e.g. "Ministry of Social Justice and Empowerment", "AICTE", "UGC", "Reliance Foundation").
-   - **Financial Benefit**: RegEx parsing for currency amounts (`₹50,000`, `Rs. 50,000`, `INR 2.5 Lakhs`, `per annum`, `monthly stipend`) and in-kind benefits (`100% Tuition Fee Waiver`).
-   - **Dates & Deadlines**: Parses Indian formats (`DD/MM/YYYY`, `DD-MM-YYYY`, `DD Month YYYY`) with contextual boundary matching.
-   - **Eligibility & Academic Criteria**: Extracts education levels, income thresholds (e.g. `< ₹2.5 Lakhs`), gender specifications, and category reservations (`SC`, `ST`, `OBC`, `PwD`).
-   - **Application URLs**: Safely extracted and SSRF-checked.
-   - **Anti-Hallucination Policy**: Fields with no supporting evidence remain strictly `None`/null and are displayed as *"Not specified"* in the user interface.
+| Criterion | Max Points | Evaluation Rules |
+| :--- | :---: | :--- |
+| **Official Primary Source Established** | 25 | Government apex (.gov.in/.nic.in) = 25 pts; University (.ac.in/.edu.in) = 23 pts; Corporate CSR / Trust = 20 pts; Aggregator = 0 pts (-25 pts deduction). |
+| **Scholarship-Specific Identity & Presence** | 20 | Distinct opportunity name = 20 pts; umbrella/multi-scheme portal title = 5 pts (-15 pts deduction); absent provider = -5 pts. |
+| **Critical Fields Supported by Evidence** | 20 | 5 pts each for Name, Provider, Eligibility Criteria, and Benefit/Course Level. Weak container snippets penalized by 50%. |
+| **Application URL Verified** | 10 | Official portal link = 10 pts; legitimately absent/closed (`NOT_APPLICABLE`) = 10 pts; third-party/untrusted domain = 3 pts; missing when required = 0 pts. |
+| **Deadline Supported by Contextual Evidence** | 10 | Explicit deadline keyword context = 10 pts; generic date = 4 pts; expired deadline = 0 pts (-10 pts deduction); rolling/ongoing = 6 pts. |
+| **Source Freshness & Successful Fetch** | 10 | HTTP 200 within 14 days = 10 pts; within 60 days = 7 pts; aged (>120 days) = 1 pt; HTTP error = 0 pts. |
+| **Extraction Consistency & Contradictions** | 5 | Clean internal consistency = 5 pts; conflicting dates, multiple deadlines, or conflated multi-schemes = 0 pts. |
 
-3. **Field-Level Traceable Evidence (`field_evidence` table)**:
-   - For every extracted attribute, a distinct `FieldEvidence` row is persisted with:
-     - Exact `extracted_value`
-     - Verbatim `evidence_text` snippet from source HTML
-     - Source URL and page title
-     - SHA-256 `content_hash` of the fetched page
-     - DOM selector or element tag path
-     - Validation status (`VALID`)
-   - Allows full audit trace:
-     `Scholarship record → Extracted field → Evidence record → Original official URL → Content Hash`.
+### C. 7 Mandatory Verification Gates
+1. `official_source_gate`: Validates official primary domain classification; fails for aggregators.
+2. `scholarship_identity_gate`: Validates specific singular grant opportunity; fails for directory/umbrella titles.
+3. `field_evidence_gate`: Requires direct `SUPPORTED` evidence for critical fields; fails on generic body dumps.
+4. `contradiction_gate`: Validates absence of conflicting dates, benefits, or multi-scheme conflations.
+5. `freshness_gate`: Confirms HTTP 200 success and fetch age $\le 90$ days.
+6. `application_link_gate`: Validates official application domain or enforces `NOT_APPLICABLE` rule.
+7. `lifecycle_gate`: Validates deadline against evaluation date; fails immediately if closing date is expired.
 
 ---
 
-## 3. Database Schema (`backend/app/db/models.py`)
+## 3. Database Schema
 
-- `scholarships`: Structured opportunities with `stable_id`, `name`, `provider`, `official_source_url`, `amount_benefit`, `closing_date`, `course_level`, `income_criteria`, `lifecycle_status`, `page_type`, and `content_hash`.
-- `field_evidence`: Verbatim snippets linked to individual fields and parent scholarship records.
-- `extraction_runs`: Audit history of extraction sessions with scanned, extracted, insufficient, and failure counts.
-- `candidate_urls`: Discovered candidate links and relevance scores.
-- `crawl_attempts`: HTTP fetch results with SHA-256 content hashes and raw HTML snapshots.
-- `seed_sources`: Configured authentic portal entrypoints.
+- `scholarships`: Includes `verification_status` (`UNVERIFIED`, `VERIFIED`, `REVIEW_REQUIRED`, `NO_LONGER_VERIFIABLE`) and `confidence_score`.
+- `field_evidence`: Includes `quality_rating` (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`).
+- `verification_records`: Complete audit history of each verification evaluation (`confidence_score`, `verification_status`, `lifecycle_status`, `scoring_breakdown`, `gate_results`, `deductions_reasons`, `evidence_references`, `is_latest`, `verified_at`).
+- `extraction_runs`, `candidate_urls`, `crawl_attempts`, `seed_sources`.
 
 ---
 
 ## 4. Phased Implementation Roadmap
 
-- [x] **Phase 1**: Project Foundation, SQLite database, FastAPI backend, React/Vite/TS dashboard, configuration, test suite.
-- [x] **Phase 2**: Real Scholarship Discovery, Ethical HTTP Crawling, SSRF Protection, Robots.txt, Source Classifier, Candidate Extraction, and Crawl History Audit Trail.
-- [x] **Phase 3**: Deterministic Scholarship Field Extraction (Title, Provider, Eligibility, Award Amount, Deadline, Official URL, and Field-Level Verbatim Evidence).
-- [ ] **Phase 4**: Deterministic Confidence & Verification Engine (Strict ≥95% confidence threshold for VERIFIED status).
-- [ ] **Phase 5**: Lifecycle Change Detection (Active, Stale, Expired), Diff Auditing, Full Interactive Dashboard, and Benchmark Evaluation.
+- **Phase 1: Project Foundation** — COMPLETED (FastAPI, SQLite, basic models, health checks).
+- **Phase 2: Authentic Crawling & Discovery** — COMPLETED (SSRF guard, robots.txt, domain throttles, candidate discovery).
+- **Phase 3: Deterministic Extraction & Verbatim Evidence** — COMPLETED (Page assessor, field extractor, date/amount parsers, field_evidence table).
+- **Phase 4: Deterministic Confidence Engine & Verification** — COMPLETED (100-pt scoring model, 7 mandatory gates, audit history, React verification dashboard).
+- **Phase 5: Change Detection & Alerting Engine** — NEXT PHASE (Content diff tracking, notification triggers, lifecycle progression).
