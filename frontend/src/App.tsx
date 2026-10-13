@@ -108,20 +108,63 @@ interface ScholarshipVerificationDetail {
   verified_at: string
 }
 
+interface ChangeHistoryItem {
+  id: number
+  scholarship_id: number
+  field_name: string
+  previous_value: string | null
+  new_value: string | null
+  detection_timestamp: string
+  previous_evidence_id: number | null
+  new_evidence_id: number | null
+  source_url: string
+  crawl_run_id: number | null
+  change_classification: string
+  requires_reverification: boolean
+  is_reviewed: boolean
+}
+
+interface SchedulerStatus {
+  is_active: boolean
+  is_running_job: boolean
+  interval_seconds: number
+  last_run_time: string | null
+  last_run_status: string | null
+  last_run_summary: any
+  next_run_time: string | null
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'scholarships' | 'candidates'>('scholarships')
+  const [activeTab, setActiveTab] = useState<'scholarships' | 'candidates' | 'changes'>('scholarships')
   const [scholarships, setScholarships] = useState<ScholarshipItem[]>([])
   const [totalScholarships, setTotalScholarships] = useState<number>(0)
   const [candidates, setCandidates] = useState<CandidateItem[]>([])
   const [totalCandidates, setTotalCandidates] = useState<number>(0)
+  const [changes, setChanges] = useState<ChangeHistoryItem[]>([])
+  const [totalChanges, setTotalChanges] = useState<number>(0)
+  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null)
+  
   const [loading, setLoading] = useState<boolean>(false)
   const [extracting, setExtracting] = useState<boolean>(false)
   const [verifying, setVerifying] = useState<boolean>(false)
+  const [runningCrawl, setRunningCrawl] = useState<boolean>(false)
+
   const [verificationSummary, setVerificationSummary] = useState<VerificationSummary | null>(null)
   const [selectedScholarship, setSelectedScholarship] = useState<ScholarshipDetailResponse | null>(null)
   const [selectedVerification, setSelectedVerification] = useState<ScholarshipVerificationDetail | null>(null)
+  const [selectedScholarshipChanges, setSelectedScholarshipChanges] = useState<{ id: number; name: string; items: ChangeHistoryItem[] } | null>(null)
+  
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+
+  const fetchSchedulerStatus = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/scheduler/status')
+      if (res.ok) setSchedulerStatus(await res.json())
+    } catch {
+      setSchedulerStatus(null)
+    }
+  }
 
   const fetchVerificationSummary = async () => {
     try {
@@ -164,6 +207,19 @@ export default function App() {
     }
   }
 
+  const fetchRecentChanges = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/changes/recent?page=1&page_size=50')
+      if (res.ok) {
+        const data = await res.json()
+        setChanges(data.items)
+        setTotalChanges(data.total)
+      }
+    } catch (err) {
+      console.error('Error fetching change history:', err)
+    }
+  }
+
   const triggerExtraction = async () => {
     setExtracting(true)
     try {
@@ -202,6 +258,45 @@ export default function App() {
     }
   }
 
+  const triggerUpdateCycle = async () => {
+    setRunningCrawl(true)
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/crawl/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_pages: 5 }),
+      })
+      if (res.ok) {
+        await fetchScholarships()
+        await fetchVerificationSummary()
+        await fetchRecentChanges()
+        await fetchSchedulerStatus()
+      }
+    } catch (err) {
+      console.error('Error running crawl update cycle:', err)
+    } finally {
+      setRunningCrawl(false)
+    }
+  }
+
+  const handleStartScheduler = async () => {
+    try {
+      await fetch('http://127.0.0.1:8000/api/scheduler/start', { method: 'POST' })
+      await fetchSchedulerStatus()
+    } catch (err) {
+      console.error('Error starting scheduler:', err)
+    }
+  }
+
+  const handleStopScheduler = async () => {
+    try {
+      await fetch('http://127.0.0.1:8000/api/scheduler/stop', { method: 'POST' })
+      await fetchSchedulerStatus()
+    } catch (err) {
+      console.error('Error stopping scheduler:', err)
+    }
+  }
+
   const handleInspectEvidence = async (id: number) => {
     try {
       const res = await fetch(`http://127.0.0.1:8000/api/scholarships/${id}`)
@@ -226,22 +321,74 @@ export default function App() {
     }
   }
 
+  const handleInspectScholarshipChanges = async (s: ScholarshipItem) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/scholarships/${s.id}/changes`)
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedScholarshipChanges({ id: s.id, name: s.name || 'Scholarship', items: data })
+      }
+    } catch (err) {
+      console.error('Error loading scholarship change history:', err)
+    }
+  }
+
   useEffect(() => {
     fetchScholarships()
     fetchCandidates()
     fetchVerificationSummary()
+    fetchRecentChanges()
+    fetchSchedulerStatus()
   }, [categoryFilter, searchQuery])
 
   return (
     <div className="container">
       <header className="header">
-        <div className="badge">EDXSO Assignment 2 • Phase 4 Evidence Verification & Confidence Engine</div>
+        <div className="badge">EDXSO Assignment 2 • Phase 5 Recrawling, Change Detection & Lifecycle</div>
         <h1>Scholarship Intelligence Crawler</h1>
         <p className="subtitle">
-          Deterministic verification evaluating authenticity, freshness, and completeness using verifiable source evidence.
-          LLMs never invent confidence scores.
+          Automated ethical recrawling, deterministic field-level change detection, preserved historical observations,
+          and lifecycle transition management.
         </p>
       </header>
+
+      {/* Scheduler Control & Status Banner */}
+      <section className="scheduler-banner">
+        <div className="scheduler-info">
+          <div className="scheduler-status-row">
+            <span className="scheduler-label">Recurring Crawl Scheduler:</span>
+            <span className={`scheduler-pill ${schedulerStatus?.is_running_job ? 'running' : schedulerStatus?.is_active ? 'active' : 'stopped'}`}>
+              {schedulerStatus?.is_running_job ? '⚡ CRAWL JOB IN PROGRESS' : schedulerStatus?.is_active ? '● ACTIVE (DAEMON RUNNING)' : '○ STOPPED'}
+            </span>
+            <span className="scheduler-interval">
+              Interval: {schedulerStatus?.interval_seconds ? `${schedulerStatus.interval_seconds / 60}m` : '60m'}
+            </span>
+          </div>
+          <div className="scheduler-meta">
+            <span>Next Run: {schedulerStatus?.next_run_time ? new Date(schedulerStatus.next_run_time).toLocaleTimeString() : 'Not scheduled'}</span>
+            <span>Last Run: {schedulerStatus?.last_run_time ? new Date(schedulerStatus.last_run_time).toLocaleTimeString() : 'Never'} ({schedulerStatus?.last_run_status || 'None'})</span>
+          </div>
+        </div>
+        <div className="scheduler-actions">
+          {schedulerStatus?.is_active ? (
+            <button type="button" className="btn-scheduler stop" onClick={handleStopScheduler}>
+              Stop Scheduler
+            </button>
+          ) : (
+            <button type="button" className="btn-scheduler start" onClick={handleStartScheduler}>
+              Start Scheduler
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-scheduler run"
+            onClick={triggerUpdateCycle}
+            disabled={runningCrawl || schedulerStatus?.is_running_job}
+          >
+            {runningCrawl ? 'Running Cycle...' : 'Run Update Cycle Now'}
+          </button>
+        </div>
+      </section>
 
       {/* Metrics Bar with Real Verification Data */}
       <section className="metrics-bar">
@@ -261,11 +408,9 @@ export default function App() {
           <span className="metric-num text-danger">{verificationSummary?.expired_count ?? 0}</span>
           <span className="metric-label">Expired Deadlines</span>
         </div>
-        <div className="metric-box confidence">
-          <span className="metric-num text-accent">
-            {verificationSummary ? `${verificationSummary.average_confidence}%` : '—'}
-          </span>
-          <span className="metric-label">Avg. Deterministic Confidence</span>
+        <div className="metric-box changes">
+          <span className="metric-num text-accent">{totalChanges}</span>
+          <span className="metric-label">Detected Changes</span>
         </div>
       </section>
 
@@ -276,6 +421,12 @@ export default function App() {
           onClick={() => setActiveTab('scholarships')}
         >
           Extracted Scholarships ({totalScholarships})
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'changes' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('changes'); fetchRecentChanges(); }}
+        >
+          Field Change History ({totalChanges})
         </button>
         <button
           className={`tab-btn ${activeTab === 'candidates' ? 'active' : ''}`}
@@ -290,7 +441,7 @@ export default function App() {
           <section className="card">
             <div className="card-header">
               <div>
-                <h2>Structured Scholarship Records & Verification</h2>
+                <h2>Structured Scholarship Records & Lifecycle</h2>
                 <p className="section-desc">
                   Authenticity verified against 7 mandatory gates. Records marked VERIFIED only when score ≥ 95% and all gates pass.
                 </p>
@@ -431,14 +582,90 @@ export default function App() {
                             <button
                               type="button"
                               className="btn-action secondary"
+                              onClick={() => handleInspectScholarshipChanges(s)}
+                            >
+                              Change History
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-action secondary"
                               onClick={() => handleInspectEvidence(s.id)}
                             >
-                              Field Evidence ({s.evidence_count})
+                              Evidence ({s.evidence_count})
                             </button>
                           </td>
                         </tr>
                       )
                     })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'changes' && (
+          <section className="card">
+            <div className="card-header">
+              <div>
+                <h2>Field-Level Change Audit History ({totalChanges})</h2>
+                <p className="section-desc">
+                  Immutable audit records tracking old vs new values, detection timestamps, evidence links, and re-verification triggers.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="refresh-btn secondary"
+                onClick={fetchRecentChanges}
+              >
+                Refresh Changes
+              </button>
+            </div>
+
+            <div className="table-responsive">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Scholarship ID</th>
+                    <th>Field Name</th>
+                    <th>Change Classification</th>
+                    <th>Previous Value</th>
+                    <th>New Observed Value</th>
+                    <th>Re-Verification</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {changes.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center empty-cell">
+                        No changes detected yet. Unchanged pages do not produce duplicate change entries.
+                      </td>
+                    </tr>
+                  ) : (
+                    changes.map((ch) => (
+                      <tr key={ch.id}>
+                        <td className="timestamp-cell">
+                          {new Date(ch.detection_timestamp).toLocaleString()}
+                        </td>
+                        <td>#{ch.scholarship_id}</td>
+                        <td><strong>{ch.field_name}</strong></td>
+                        <td>
+                          <span className={`change-classification-tag ${ch.change_classification.toLowerCase()}`}>
+                            {ch.change_classification.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="diff-old">{ch.previous_value || '— (None)'}</td>
+                        <td className="diff-new">{ch.new_value || '— (None)'}</td>
+                        <td>
+                          {ch.requires_reverification ? (
+                            <span className="reverify-tag required">Required</span>
+                          ) : (
+                            <span className="reverify-tag not-required">No</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -494,6 +721,67 @@ export default function App() {
               </table>
             </div>
           </section>
+        )}
+
+        {/* Scholarship-Specific Change History Modal */}
+        {selectedScholarshipChanges && (
+          <div className="modal-backdrop" onClick={() => setSelectedScholarshipChanges(null)}>
+            <div className="modal-content modal-changes" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <span className="modal-badge">
+                    AUDIT TRAIL • SCHOLARSHIP #{selectedScholarshipChanges.id}
+                  </span>
+                  <h2>Change History: {selectedScholarshipChanges.name}</h2>
+                </div>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => setSelectedScholarshipChanges(null)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="modal-body">
+                {selectedScholarshipChanges.items.length === 0 ? (
+                  <p className="empty-text">No recorded field changes for this scholarship yet. Current observations remain unchanged.</p>
+                ) : (
+                  <div className="changes-timeline">
+                    {selectedScholarshipChanges.items.map((item) => (
+                      <div key={item.id} className="change-timeline-card">
+                        <div className="timeline-header">
+                          <span className={`change-classification-tag ${item.change_classification.toLowerCase()}`}>
+                            {item.change_classification.replace(/_/g, ' ')}
+                          </span>
+                          <span className="timeline-date">{new Date(item.detection_timestamp).toLocaleString()}</span>
+                        </div>
+                        <div className="timeline-field">
+                          Field: <strong>{item.field_name}</strong>
+                        </div>
+                        <div className="timeline-diff">
+                          <div className="diff-box old">
+                            <span className="diff-label">Previous Value:</span>
+                            <span className="diff-text">{item.previous_value || 'None'}</span>
+                          </div>
+                          <div className="diff-arrow">➔</div>
+                          <div className="diff-box new">
+                            <span className="diff-label">New Value:</span>
+                            <span className="diff-text">{item.new_value || 'None'}</span>
+                          </div>
+                        </div>
+                        {item.requires_reverification && (
+                          <div className="timeline-footer">
+                            <span className="reverify-tag required">Triggered Deterministic Re-Verification</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Verification Audit Modal */}
@@ -754,18 +1042,18 @@ export default function App() {
               <p>Deterministic confidence scoring engine; strictly ≥95% required for VERIFIED status.</p>
               <span className="state-tag active">COMPLETED</span>
             </div>
-            <div className="phase-badge pending">
+            <div className="phase-badge completed">
               <span className="phase-num">Phase 5</span>
-              <h3>Change Detection & UI</h3>
-              <p>Audit logging, diff tracking, status lifecycle (Active, Stale, Expired), and full UI.</p>
-              <span className="state-tag">NEXT PHASE</span>
+              <h3>Change Detection & Lifecycle</h3>
+              <p>Repeatable scheduler, field diff tracking, lifecycle transitions, and audit trail.</p>
+              <span className="state-tag active">COMPLETED</span>
             </div>
           </div>
         </section>
       </main>
 
       <footer className="footer">
-        <p>Scholarship Intelligence Crawler • Phase 4 Verification & Confidence Engine • Zero hallucinated scores</p>
+        <p>Scholarship Intelligence Crawler • Phase 5 Automatic Recrawling, Change Detection & Lifecycle • Complete Audit Trail</p>
       </footer>
     </div>
   )

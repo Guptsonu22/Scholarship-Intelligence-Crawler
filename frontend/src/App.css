@@ -919,6 +919,353 @@ body {
 .quality-badge.conflicting { background: rgba(239, 68, 68, 0.2); color: #f87171; }
 .quality-badge.stale { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
 
+/* ========================================================
+   Phase 5 — Scheduler, Change History & Audit Styles
+   ======================================================== */
+
+.scheduler-banner {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--card-radius);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.scheduler-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scheduler-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scheduler-label {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.scheduler-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scheduler-pill.active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.scheduler-pill.running {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid #38bdf8;
+  animation: pulse-border 1.5s infinite;
+}
+
+.scheduler-pill.stopped {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+
+.scheduler-interval {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.scheduler-meta {
+  display: flex;
+  gap: 18px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.scheduler-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-scheduler {
+  border: none;
+  font-weight: 600;
+  font-size: 0.84rem;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-scheduler.start {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.btn-scheduler.start:hover {
+  background: #22c55e;
+  color: #0f172a;
+}
+
+.btn-scheduler.stop {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-scheduler.stop:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.btn-scheduler.run {
+  background: var(--accent-color);
+  color: #0f172a;
+  border: 1px solid var(--accent-hover);
+}
+
+.btn-scheduler.run:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: white;
+}
+
+.btn-scheduler:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Action Buttons in Scholarship Table */
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-action {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action.primary {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: var(--accent-color);
+}
+
+.btn-action.primary:hover {
+  background: var(--accent-color);
+  color: #0f172a;
+}
+
+.btn-action.secondary {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-action.secondary:hover {
+  background: #475569;
+  border-color: #64748b;
+}
+
+/* Change History Table Styles */
+.diff-old {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  max-width: 200px;
+  word-break: break-word;
+}
+
+.diff-new {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.08);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  max-width: 200px;
+  word-break: break-word;
+}
+
+.change-classification-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.change-classification-tag.critical_update {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.change-classification-tag.deadline_extension {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.change-classification-tag.deadline_passed {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.change-classification-tag.update {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.change-classification-tag.initial_discovery {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.reverify-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.reverify-tag.required {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.reverify-tag.not-required {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+/* Modal Changes Timeline */
+.modal-changes {
+  max-width: 800px !important;
+}
+
+.changes-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.change-timeline-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timeline-date {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.timeline-field {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.timeline-diff {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.diff-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diff-box.old {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.diff-box.new {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.diff-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.diff-box.old .diff-text {
+  color: #f87171;
+  font-size: 0.84rem;
+}
+
+.diff-box.new .diff-text {
+  color: #4ade80;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.diff-arrow {
+  color: var(--accent-color);
+  font-size: 1.1rem;
+}
+
+.timeline-footer {
+  margin-top: 4px;
+}
+
 .footer {
   text-align: center;
   font-size: 0.8rem;
