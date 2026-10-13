@@ -7,6 +7,9 @@ from .models import (
     CandidateURL,
     CrawlRun,
     CrawlAttempt,
+    Scholarship,
+    FieldEvidence,
+    ExtractionRun,
 )
 
 __all__ = [
@@ -21,4 +24,7 @@ __all__ = [
     "CandidateURL",
     "CrawlRun",
     "CrawlAttempt",
+    "Scholarship",
+    "FieldEvidence",
+    "ExtractionRun",
 ]

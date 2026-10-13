@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -125,3 +125,107 @@ class CrawlRunResponse(BaseModel):
     pages_attempted: int
     pages_succeeded: int
     pages_failed: int
+
+
+# --- Phase 3: Extraction & Field Evidence Schemas ---
+
+class FieldEvidenceSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    scholarship_id: Optional[int] = None
+    candidate_id: Optional[int] = None
+    field_name: str
+    extracted_value: Optional[str] = None
+    source_url: str
+    evidence_text: str
+    page_title: Optional[str] = None
+    retrieval_timestamp: datetime
+    content_hash: Optional[str] = None
+    extraction_method: str
+    html_selector: Optional[str] = None
+    validation_status: str
+
+
+class ScholarshipSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    stable_id: str
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    official_source_url: str
+    application_url: Optional[str] = None
+    source_category: str
+    is_official_source: bool
+
+    amount_benefit: Optional[str] = None
+    amount_details: Optional[str] = None
+    eligibility_summary: Optional[str] = None
+    academic_requirements: Optional[str] = None
+    course_level: Optional[str] = None
+    income_criteria: Optional[str] = None
+    age_criteria: Optional[str] = None
+    gender_criteria: Optional[str] = None
+    category_requirements: Optional[str] = None
+    domicile_state: Optional[str] = None
+    institution_requirements: Optional[str] = None
+
+    opening_date: Optional[str] = None
+    closing_date: Optional[str] = None
+    documents_required: Optional[str] = None
+    selection_process: Optional[str] = None
+    renewal_requirements: Optional[str] = None
+
+    lifecycle_status: str
+    page_type: str
+    extraction_timestamp: datetime
+    last_fetched_timestamp: Optional[datetime] = None
+    content_hash: Optional[str] = None
+    extraction_method: str
+    validation_warnings: Optional[str] = None
+    evidence_count: int = 0
+
+
+class ScholarshipDetailSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    scholarship: ScholarshipSchema
+    evidence_records: List[FieldEvidenceSchema] = []
+
+
+class ScholarshipListResponse(BaseModel):
+    items: List[ScholarshipSchema]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class ExtractionRunRequest(BaseModel):
+    candidate_ids: Optional[List[int]] = Field(None, description="Optional list of candidate IDs to extract from")
+    max_candidates: int = Field(10, ge=1, le=50, description="Max candidate pages to process")
+
+
+class ExtractionRunResponse(BaseModel):
+    run_id: int
+    status: str
+    message: str
+    candidates_scanned: int
+    scholarships_extracted: int
+    insufficient_evidence_count: int
+    failed_count: int
+
+
+class ExtractionRunSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    status: str
+    candidates_scanned: int
+    scholarships_extracted: int
+    insufficient_evidence_count: int
+    failed_count: int
+    error_message: Optional[str] = None

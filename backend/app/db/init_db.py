@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.db.database import Base, engine, SessionLocal
 from app.db.models import (
@@ -7,6 +8,9 @@ from app.db.models import (
     CandidateURL,
     CrawlRun,
     CrawlAttempt,
+    Scholarship,
+    FieldEvidence,
+    ExtractionRun,
 )
 
 DEFAULT_SEEDS = [
@@ -125,8 +129,20 @@ DEFAULT_SEEDS = [
 
 
 def init_db() -> None:
-    """Initialize database tables and seed default discovery sources."""
+    """Initialize database tables, apply safe migrations, and seed default sources."""
+    # Create all newly declared tables
     Base.metadata.create_all(bind=engine)
+
+    # Safe column migration check for SQLite
+    try:
+        with engine.connect() as conn:
+            res = conn.execute(text("PRAGMA table_info(crawl_attempts)"))
+            cols = [row[1] for row in res.fetchall()]
+            if cols and "raw_html" not in cols:
+                conn.execute(text("ALTER TABLE crawl_attempts ADD COLUMN raw_html TEXT"))
+                conn.commit()
+    except Exception:
+        pass
 
     # Populate default seed sources if not present
     db: Session = SessionLocal()

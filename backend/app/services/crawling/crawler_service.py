@@ -78,6 +78,7 @@ class CrawlerService:
             status=result.status,
             error_reason=result.error_reason,
             extracted_links_count=extracted_count,
+            raw_html=result.html if result.status == "SUCCESS" else None,
         )
 
         db.add(attempt)
