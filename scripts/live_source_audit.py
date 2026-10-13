@@ -77,7 +77,9 @@ for target in test_targets:
             print(f"Live Extracted Provider: '{extracted.provider}'")
             print(f"Live Extracted Amount: '{extracted.amount_benefit}'")
             print(f"Live Extracted App URL: '{extracted.application_url}'")
-            print(f"Live Evidence count: {len(extracted.evidence)}")
+            print(f"Live Evidence count: {len(extracted.evidence_list)} items")
+            for ev_item in extracted.evidence_list:
+                print(f"  -> {ev_item.field_name}: '{ev_item.extracted_value[:35]}' [{ev_item.html_selector}]")
             print("Audit Status: LIVE FETCH AND EXTRACTION CONFIRMED")
         else:
             print(f"Error Reason: {res.error_reason}")
