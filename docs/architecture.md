@@ -8,16 +8,28 @@ The **Scholarship Intelligence Crawler** is an automated, reliable system design
 graph TD
     subgraph UI [Frontend Layer]
         Dashboard[React + TypeScript + Vite Dashboard]
+        SchedulerBanner[Scheduler Controls & Progress Banner]
+        ChangesTab[Field-Level Change History Audit]
         EvidenceModal[Traceable Evidence Inspector]
         VerificationModal[Verification & Gate Audit Modal]
+        ChangesModal[Scholarship Timeline Diff Modal]
     end
 
     subgraph API [FastAPI Backend Layer]
         HealthRoute[GET /api/health]
+        SchedulerRoutes[POST /api/scheduler/start<br/>POST /api/scheduler/stop<br/>GET /api/scheduler/status]
+        ChangesRoutes[GET /api/changes/recent<br/>GET /api/scholarships/:id/changes]
         DiscoveryRoutes[GET /api/discovery/sources<br/>POST /api/discovery/run<br/>GET /api/discovery/candidates]
-        CrawlRoutes[GET /api/crawl/runs<br/>POST /api/crawl/run<br/>GET /api/crawl/candidates/:id]
+        CrawlRoutes[GET /api/crawl/runs<br/>POST /api/crawl/run<br/>GET /api/crawl/status<br/>GET /api/crawl/candidates/:id]
         ExtractionRoutes[POST /api/extraction/run<br/>GET /api/extraction/runs<br/>GET /api/scholarships<br/>GET /api/scholarships/:id<br/>GET /api/scholarships/:id/evidence]
         VerificationRoutes[POST /api/verification/run<br/>GET /api/verification/summary<br/>GET /api/verification/history/:id<br/>GET /api/scholarships/:id/verification]
+    end
+
+    subgraph Phase5Engine [Phase 5: Scheduler, Change Detection & Lifecycle Engine]
+        CrawlScheduler[Crawl Scheduler: Thread-Safe Singleton & Overlap Guard]
+        ChangeDetector[Change Detector: Normalization & Noise Filter]
+        LifecycleManager[Lifecycle Manager: ACTIVE / EXPIRING_SOON / EXPIRED / STALE / NO_LONGER_VERIFIABLE]
+        ReverificationTrigger[Automatic Re-Verification Dispatcher]
     end
 
     subgraph VerificationEngine [Phase 4: Deterministic Verification Engine]
@@ -39,28 +51,85 @@ graph TD
     subgraph Storage [Storage Layer]
         SQLite[(Persistent SQLite Database: data/scholarships.db)]
         SchTable[scholarships]
-        EvTable[field_evidence]
+        EvTable[field_evidence: is_current flag]
+        ChgTable[scholarship_change_history]
         VerTable[verification_records]
-        RunsTable[extraction_runs]
+        RunsTable[crawl_runs]
         CandTable[candidate_urls]
         AttemptsTable[crawl_attempts]
     end
 
-    Dashboard <-->|REST API / JSON| API
+    Dashboard --> SchedulerBanner
+    Dashboard --> ChangesTab
     Dashboard --> EvidenceModal
     Dashboard --> VerificationModal
+    Dashboard --> ChangesModal
+    Dashboard <-->|REST API / JSON| API
+
+    SchedulerRoutes --> CrawlScheduler
+    CrawlRoutes --> CrawlScheduler
+    ChangesRoutes --> ChgTable
+    CrawlScheduler --> Crawler
+    Crawler --> ChangeDetector
+    ChangeDetector --> Storage
+    ChangeDetector --> ReverificationTrigger
+    ReverificationTrigger --> VerificationEngine
+    LifecycleManager --> Storage
+
     VerificationRoutes --> VerificationEngine
     VerificationEngine --> ScoringModel
     VerificationEngine --> MandatoryGates
     VerificationEngine --> EvidenceEvaluator
     VerificationEngine --> Storage
-    ExtractionRoutes --> Extractor
-    Extractor --> Storage
 ```
 
 ---
 
-## 2. Phase 4: Deterministic Confidence Engine & Verification
+## 2. Phase 5: Recrawling, Change Detection & Lifecycle Architecture
+
+### A. Thread-Safe Scheduler & Overlap Guard
+- **Concurrency Control**: Implemented with atomic thread locks (`threading.Lock()`). Any trigger (manual or timer-based) arriving while `is_running_job` is active is rejected with `OVERLAPPING_REJECTED` status.
+- **Prioritization Strategy**:
+  1. Previously verified or review-required scholarships due for re-crawl/re-verification.
+  2. Uncrawled candidate URLs from authoritative government or educational domains.
+  3. General candidates complying with per-domain polite delay ($\ge 2.0$s) and robots.txt.
+
+### B. Distinguishing Genuine Changes from Extraction Noise
+1. **Content Hashing**: SHA-256 hash comparison avoids unnecessary DOM extraction if HTML content is byte-for-byte identical.
+2. **Whitespace and Format Normalization**: `normalize_value()` collapses multiple spaces, tabs, line breaks, and whitespace artifacts.
+3. **Empty Observation Protection**: When a page re-crawl yields `None` for a previously extracted field (e.g. temporary DOM rendering differences), the engine **strictly preserves the prior value and evidence**. An extraction failure is never treated as a deletion.
+4. **Non-Destructive Observation Preservation**:
+   - The prior `FieldEvidence` row is marked `is_current = False`.
+   - The new `FieldEvidence` row is persisted with `is_current = True`.
+   - An immutable row is created in `scholarship_change_history` capturing `previous_value`, `new_value`, both evidence IDs, official source URL, timestamp, and re-verification triggers.
+
+### C. Lifecycle State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE: Fresh Crawl & Future Closing Date
+    ACTIVE --> EXPIRING_SOON: Closing Date within 14 Days
+    EXPIRING_SOON --> EXPIRED: Closing Date Passed
+    ACTIVE --> EXPIRED: Closing Date Passed
+    ACTIVE --> STALE: Age > 90 Days Without Re-crawl
+    ACTIVE --> NO_LONGER_VERIFIABLE: Persistent 404 or Official Removal Notice
+    ACTIVE --> REVIEW_REQUIRED: Critical Field Change or Gate Failure
+    REVIEW_REQUIRED --> ACTIVE: Re-verification Pass (≥95% + All Gates Pass)
+    EXPIRED --> REVIEW_REQUIRED: Potential Extension Without Date Confirmation
+```
+
+### D. Critical Re-Verification Fields
+A change in any of the following fields automatically invalidates the prior `VERIFIED` status and triggers deterministic re-evaluation:
+- `name`
+- `provider`
+- `amount_benefit`
+- `eligibility_summary`
+- `closing_date`
+- `application_url`
+
+---
+
+## 3. Phase 4: Deterministic Confidence Engine & Verification
 
 ### A. Core Verification Principles
 1. **Zero Hallucination Scoring**: The engine never uses LLMs or probabilistic heuristics to invent confidence numbers. Scores are 100% deterministic and reproducible from stored evidence.
@@ -95,19 +164,20 @@ graph TD
 
 ---
 
-## 3. Database Schema
+## 4. Database Schema
 
-- `scholarships`: Includes `verification_status` (`UNVERIFIED`, `VERIFIED`, `REVIEW_REQUIRED`, `NO_LONGER_VERIFIABLE`) and `confidence_score`.
-- `field_evidence`: Includes `quality_rating` (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`).
+- `scholarships`: Includes `verification_status` (`UNVERIFIED`, `VERIFIED`, `REVIEW_REQUIRED`, `NO_LONGER_VERIFIABLE`), `lifecycle_status` (`ACTIVE`, `EXPIRING_SOON`, `EXPIRED`, `NO_LONGER_VERIFIABLE`, `REVIEW_REQUIRED`), `confidence_score`, and `last_crawled_at`.
+- `field_evidence`: Includes `quality_rating` (`SUPPORTED`, `WEAK_EVIDENCE`, `NOT_FOUND`, `CONFLICTING`, `STALE`), and `is_current` (Boolean audit flag preserving prior extractions).
+- `scholarship_change_history`: Immutable table storing `change_id`, `scholarship_id`, `field_name`, `previous_value`, `new_value`, `detection_timestamp`, `previous_evidence_id`, `new_evidence_id`, `official_source_url`, `crawl_run_id`, `change_classification`, and `requires_reverification`.
 - `verification_records`: Complete audit history of each verification evaluation (`confidence_score`, `verification_status`, `lifecycle_status`, `scoring_breakdown`, `gate_results`, `deductions_reasons`, `evidence_references`, `is_latest`, `verified_at`).
-- `extraction_runs`, `candidate_urls`, `crawl_attempts`, `seed_sources`.
+- `crawl_runs`, `candidate_urls`, `crawl_attempts`, `seed_sources`.
 
 ---
 
-## 4. Phased Implementation Roadmap
+## 5. Phased Implementation Roadmap
 
 - **Phase 1: Project Foundation** — COMPLETED (FastAPI, SQLite, basic models, health checks).
 - **Phase 2: Authentic Crawling & Discovery** — COMPLETED (SSRF guard, robots.txt, domain throttles, candidate discovery).
 - **Phase 3: Deterministic Extraction & Verbatim Evidence** — COMPLETED (Page assessor, field extractor, date/amount parsers, field_evidence table).
 - **Phase 4: Deterministic Confidence Engine & Verification** — COMPLETED (100-pt scoring model, 7 mandatory gates, audit history, React verification dashboard).
-- **Phase 5: Change Detection & Alerting Engine** — NEXT PHASE (Content diff tracking, notification triggers, lifecycle progression).
+- **Phase 5: Automatic Recrawling, Change Detection & Scholarship Lifecycle** — COMPLETED (Repeatable scheduler, overlap prevention, field-level change history, historical evidence preservation, noise filtering, lifecycle transitions, React scheduler/changes dashboard, 78 automated tests).
